@@ -6,8 +6,43 @@ const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose'); // Make sure this is at the top with other requires
 const { verifyAdmin } = require('../middleware/adminAuth');
+const upload = require('../middleware/upload'); // This is for categories, will be unused for product image uploads now
 const multer = require('multer'); // Import multer
 const xlsx = require('xlsx');
+const { v4: uuidv4 } = require('uuid'); // For unique filenames
+
+// --- Multer configuration for Product Images ---
+const productImagesDir = path.join(__dirname, '../../uploads/product_images');
+if (!fs.existsSync(productImagesDir)) {
+    fs.mkdirSync(productImagesDir, { recursive: true });
+}
+
+const productImageStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, productImagesDir);
+    },
+    filename: (req, file, cb) => {
+        const fileName = uuidv4() + path.extname(file.originalname);
+        cb(null, fileName);
+    }
+});
+
+const productImageFileFilter = (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        req.fileValidationError = 'Tip de fișier invalid. Sunt permise doar fișiere JPEG, PNG, JPG, WEBP.';
+        cb(null, false);
+    }
+};
+
+const productImagesUpload = multer({
+    storage: productImageStorage,
+    fileFilter: productImageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit per file
+}).array('images', 10); // Field name 'images', max 10 files
+// --- End Multer configuration for Product Images ---
 
 // @route   GET /api/products/download-template
 // @desc    Download Excel template for bulk upload
@@ -37,7 +72,7 @@ router.get('/download-template', verifyAdmin, (req, res) => {
                 'CategoryName': 'Tricouri',
                 'Status': 'active',
                 'Specifications': '{"Material": "Bumbac 100%", "Greutate": "180g/m²", "Fit": "Regular"}',
-                'Instructions': '["Se spală la 40°C", "Se poate călca", "Se poate usuca la uscător"]',
+                'Instructions': '["Se spală la 40°C", "Se poate călca", "Se poate usica la uscător"]',
                 'ShippingAndReturns': 'Livrare standard 15 RON. Returnare în 14 zile.',
                 'KeyFeatures': '["Bumbac natural", "Confort maxim", "Design versatil", "Ușor de întreținut"]',
                 'Colors': '[{"value": "#FFFFFF", "name": "Alb"}, {"value": "#F5F5F5", "name": "Alb crem"}]',
@@ -131,6 +166,30 @@ router.get('/download-template', verifyAdmin, (req, res) => {
             success: false, 
             message: 'Eroare la generarea template-ului Excel',
             error: error.message 
+        });
+    }
+});
+
+// @route   GET /api/products/recommended
+// @desc    Get all recommended products
+// @access  Public
+router.get('/recommended', async (req, res) => {
+    console.log('GET /api/products/recommended route hit');
+    try {
+        console.log('Trying to fetch recommended products');
+        const recommendedProducts = await Product.find({ isRecommended: true, status: 'active' })
+            .populate('category', 'name')
+            .sort({ createdAt: -1 });
+        
+        console.log('Found recommended products:', recommendedProducts.length);
+        res.json({
+            success: true,
+            data: recommendedProducts
+        });
+    } catch (err) {
+        console.error('Error fetching recommended products:', err);        res.status(500).json({
+            success: false,
+            message: 'Eroare la încărcarea produselor recomandate'
         });
     }
 });
@@ -339,6 +398,13 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
     console.log(`GET /api/products/:id route hit with ID: ${req.params.id}`);
+    
+    // Check if this is actually the recommended route that's being caught (shouldn't happen but just to be safe)
+    if (req.params.id === 'recommended') {
+        console.log('Redirecting /recommended to the correct handler');
+        return res.redirect('/api/products/recommended');
+    }
+    
     try {
         const productId = req.params.id;
         // Validate if the ID is a valid MongoDB ObjectId before querying
@@ -373,7 +439,7 @@ router.get('/:id', async (req, res) => {
 // @desc    Create a new product
 // @access  Private (admin only)
 router.post('/', verifyAdmin, (req, res) => {
-    upload(req, res, async function (err) {
+    productImagesUpload(req, res, async function (err) {
         if (req.fileValidationError) {
             return res.status(400).json({ success: false, message: req.fileValidationError });
         }
@@ -460,7 +526,7 @@ router.post('/', verifyAdmin, (req, res) => {
 // @desc    Update a product by id
 // @access  Private (admin only)
 router.put('/:id', verifyAdmin, (req, res) => {
-    upload(req, res, async function (err) {
+    productImagesUpload(req, res, async function (err) {
         if (req.fileValidationError) {
             return res.status(400).json({ success: false, message: req.fileValidationError });
         }
