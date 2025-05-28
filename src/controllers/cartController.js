@@ -23,6 +23,10 @@ async function getCart({ userId, guestId }) {
     
     // If cart found, return it
     if (cart) {
+      // Filter out items with null product
+      if (cart.items && Array.isArray(cart.items)) {
+        cart.items = cart.items.filter(item => item.product !== null);
+      }
       return cart;
     }
     
@@ -40,6 +44,10 @@ async function getCart({ userId, guestId }) {
     console.log('Looking for cart with guestId:', guestId);
     const cart = await Cart.findOne({ guestId }).populate('items.product');
     console.log('Cart found for guest:', cart ? 'Yes' : 'No');
+    // Filter out items with null product
+    if (cart && cart.items && Array.isArray(cart.items)) {
+      cart.items = cart.items.filter(item => item.product !== null);
+    }
     return cart;
   }
   
@@ -59,6 +67,11 @@ exports.getCart = async (req, res) => {
     console.log('guestId from query:', guestId);
     
     const cart = await getCart({ userId, guestId });
+
+    // Ensure cart items are filtered before sending the response
+    if (cart && cart.items && Array.isArray(cart.items)) {
+      cart.items = cart.items.filter(item => item.product !== null);
+    }
     
     res.json({ success: true, cart });
   } catch (err) {

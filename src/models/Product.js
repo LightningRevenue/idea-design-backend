@@ -59,6 +59,10 @@ const ProductSchema = new mongoose.Schema({
     ],
     default: []
   },
+  isRecommended: { // Added field for recommended products
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login } = require('../controllers/adminController');
+const { register, login, createAdmin } = require('../controllers/adminController');
 const { verifyAdmin } = require('../middleware/adminAuth');
 
 // Register route (optional, for initial setup)
@@ -36,6 +36,9 @@ router.get('/verify', verifyAdmin, (req, res) => {
     }
   });
 });
+
+// Route to create a new admin user
+router.post('/create-admin', verifyAdmin, createAdmin);
 
 // Comentate - aceste rute vor trebui implementate în viitor
 // când vom crea funcțiile corespunzătoare în adminController

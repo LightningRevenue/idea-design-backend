@@ -22,8 +22,22 @@ console.log('After dotenv.config(), MONGODB_URI is:', process.env.MONGODB_URI); 
 
 const app = express();
 
+// CORS configuration - only allow specific domains
+const corsOptions = {
+  origin: [
+    'http://localhost:5173',           // Vite dev server
+    'https://localhost:5173',          // Vite dev server HTTPS
+    'http://www.idea-design.ro',       // Production domain
+    'https://www.idea-design.ro',      // Production domain HTTPS
+    'http://idea-design.ro',           // Production domain without www
+    'https://idea-design.ro'           // Production domain without www HTTPS
+  ],
+  credentials: true,                   // Allow cookies and auth headers
+  optionsSuccessStatus: 200           // Some legacy browsers choke on 204
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

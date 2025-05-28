@@ -1,42 +1,317 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product'); // Import the Product model
-const multer = require('multer'); // Import multer
+const Category = require('../models/Category');
 const path = require('path');
 const fs = require('fs');
 const mongoose = require('mongoose'); // Make sure this is at the top with other requires
 const { verifyAdmin } = require('../middleware/adminAuth');
+const multer = require('multer'); // Import multer
+const xlsx = require('xlsx');
 
-// Ensure the upload directory for product images exists
-const productImagesDir = path.join(__dirname, '../../uploads/product_images');
-if (!fs.existsSync(productImagesDir)){
-    fs.mkdirSync(productImagesDir, { recursive: true });
-}
+// @route   GET /api/products/download-template
+// @desc    Download Excel template for bulk upload
+// @access  Private (admin only)
+router.get('/download-template', verifyAdmin, (req, res) => {
+    try {        // Create comprehensive sample data for the template
+        const templateData = [
+            {
+                'Name': 'Rochie Elegantă Neagră',
+                'Description': 'Rochie elegantă din voal negru, perfectă pentru evenimente speciale. Design modern cu croiala feminină.',
+                'Price': 299.99,
+                'Stock': 15,
+                'CategoryName': 'Rochii',
+                'Status': 'active',
+                'Specifications': '{"Material": "Voal", "Culoare": "Negru", "Talie": "Înaltă", "Lungime": "Midi"}',
+                'Instructions': '["Se spală la 30°C", "Nu se calcă direct", "Se usucă la umbră"]',
+                'ShippingAndReturns': 'Livrare gratuită pentru comenzi peste 200 RON. Returnare gratuită în 30 de zile.',
+                'KeyFeatures': '["Design elegant", "Material premium", "Croială feminină", "Potrivit pentru evenimente"]',
+                'Colors': '[{"value": "#000000", "name": "Negru"}, {"value": "#1a1a1a", "name": "Negru intens"}]',
+                'IsRecommended': 'true'
+            },
+            {
+                'Name': 'Tricou Casual Alb',
+                'Description': 'Tricou din bumbac 100%, confortabil pentru purtarea zilnică. Design simplu și versatil.',
+                'Price': 49.99,
+                'Stock': 25,
+                'CategoryName': 'Tricouri',
+                'Status': 'active',
+                'Specifications': '{"Material": "Bumbac 100%", "Greutate": "180g/m²", "Fit": "Regular"}',
+                'Instructions': '["Se spală la 40°C", "Se poate călca", "Se poate usuca la uscător"]',
+                'ShippingAndReturns': 'Livrare standard 15 RON. Returnare în 14 zile.',
+                'KeyFeatures': '["Bumbac natural", "Confort maxim", "Design versatil", "Ușor de întreținut"]',
+                'Colors': '[{"value": "#FFFFFF", "name": "Alb"}, {"value": "#F5F5F5", "name": "Alb crem"}]',
+                'IsRecommended': 'false'
+            },
+            {
+                'Name': 'Pantaloni Eleganți Bleumarin',
+                'Description': 'Pantaloni eleganți din material premium, potriviți pentru birou și ocazii speciale.',
+                'Price': 179.99,
+                'Stock': 12,
+                'CategoryName': 'Pantaloni',
+                'Status': 'draft',
+                'Specifications': '{"Material": "Poliester 65%, Viscoză 35%", "Croială": "Slim fit", "Lungime": "Regulară"}',
+                'Instructions': '["Curățare chimică recomandată", "Se poate spăla la 30°C", "Se calcă la temperatură medie"]',
+                'ShippingAndReturns': 'Livrare expresă disponibilă. Schimb gratuit pentru mărime în 7 zile.',
+                'KeyFeatures': '["Material premium", "Croială elegantă", "Versatili", "Rezistenți la șifonare"]',
+                'Colors': '[{"value": "#000080", "name": "Bleumarin"}, {"value": "#191970", "name": "Bleumarin închis"}]',
+                'IsRecommended': 'true'
+            }
+        ];
 
-// Multer disk storage configuration for product images
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, productImagesDir); // Save files to backend/uploads/product_images
-    },
-    filename: function (req, file, cb) {
-        // Create a unique filename: fieldname-timestamp.extension
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        // Create workbook and add instructions worksheet FIRST
+        const workbook = xlsx.utils.book_new();
+        
+        // Create instructions worksheet
+        const instructionsData = [
+            { 'Câmp': 'Name', 'Tip': 'OBLIGATORIU', 'Descriere': 'Numele produsului', 'Exemplu': 'Rochie Elegantă Neagră', 'Observații': 'Maxim 100 caractere' },
+            { 'Câmp': 'Description', 'Tip': 'OBLIGATORIU', 'Descriere': 'Descrierea detaliată', 'Exemplu': 'Rochie din voal negru...', 'Observații': 'Maxim 1000 caractere' },
+            { 'Câmp': 'Price', 'Tip': 'OBLIGATORIU', 'Descriere': 'Prețul în RON', 'Exemplu': '299.99', 'Observații': 'Doar numere cu punctul ca separator' },
+            { 'Câmp': 'Stock', 'Tip': 'OBLIGATORIU', 'Descriere': 'Cantitatea în stoc', 'Exemplu': '15', 'Observații': 'Doar numere întregi' },
+            { 'Câmp': 'CategoryName', 'Tip': 'OBLIGATORIU', 'Descriere': 'Numele categoriei', 'Exemplu': 'Rochii', 'Observații': 'Trebuie să existe în sistem' },
+            { 'Câmp': 'Status', 'Tip': 'OPȚIONAL', 'Descriere': 'Statusul produsului', 'Exemplu': 'active', 'Observații': 'active/draft/archived' },
+            { 'Câmp': 'Specifications', 'Tip': 'OPȚIONAL', 'Descriere': 'Specificații tehnice', 'Exemplu': '{"Material": "Voal"}', 'Observații': 'Format JSON valid' },
+            { 'Câmp': 'Instructions', 'Tip': 'OPȚIONAL', 'Descriere': 'Instrucțiuni utilizare', 'Exemplu': '["Se spală la 30°C"]', 'Observații': 'Array JSON valid' },
+            { 'Câmp': 'ShippingAndReturns', 'Tip': 'OPȚIONAL', 'Descriere': 'Info livrare/returnare', 'Exemplu': 'Livrare gratuită...', 'Observații': 'Text liber' },
+            { 'Câmp': 'KeyFeatures', 'Tip': 'OPȚIONAL', 'Descriere': 'Caracteristici principale', 'Exemplu': '["Design elegant"]', 'Observații': 'Array JSON valid' },
+            { 'Câmp': 'Colors', 'Tip': 'OPȚIONAL', 'Descriere': 'Culori disponibile', 'Exemplu': '[{"value": "#000", "name": "Negru"}]', 'Observații': 'Array obiecte JSON' },
+            { 'Câmp': 'IsRecommended', 'Tip': 'OPȚIONAL', 'Descriere': 'Produs recomandat', 'Exemplu': 'true', 'Observații': 'true sau false' }
+        ];
+        
+        const instructionsWorksheet = xlsx.utils.json_to_sheet(instructionsData);
+        
+        // Set column widths for instructions
+        const instructionsWidths = [
+            { wch: 20 }, // Câmp
+            { wch: 12 }, // Tip
+            { wch: 30 }, // Descriere
+            { wch: 35 }, // Exemplu
+            { wch: 25 }  // Observații
+        ];
+        instructionsWorksheet['!cols'] = instructionsWidths;
+        
+        // Add the instructions worksheet FIRST (it will be the default sheet)
+        xlsx.utils.book_append_sheet(workbook, instructionsWorksheet, 'Instrucțiuni');
+        
+        // Create template worksheet with sample data
+        const worksheet = xlsx.utils.json_to_sheet(templateData);
+          // Set column widths for better readability
+        const columnWidths = [
+            { wch: 25 }, // Name
+            { wch: 50 }, // Description
+            { wch: 10 }, // Price
+            { wch: 8 },  // Stock
+            { wch: 15 }, // CategoryName
+            { wch: 10 }, // Status
+            { wch: 40 }, // Specifications
+            { wch: 40 }, // Instructions
+            { wch: 50 }, // ShippingAndReturns
+            { wch: 40 }, // KeyFeatures
+            { wch: 30 }, // Colors
+            { wch: 12 }  // IsRecommended
+        ];
+        worksheet['!cols'] = columnWidths;
+        
+        // Add the template worksheet to the workbook
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'Template Produse');
+        
+        // Create buffer from workbook
+        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        
+        // Set response headers
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=template-produse-complet.xlsx');
+        res.setHeader('Content-Length', buffer.length);
+        
+        // Send the file
+        res.send(buffer);
+    } catch (error) {
+        console.error('Error generating template:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Eroare la generarea template-ului Excel',
+            error: error.message 
+        });
     }
 });
 
-// Multer upload instance for multiple images
-const upload = multer({
-    storage: storage,
-    fileFilter: function (req, file, cb) {
-        // Accept images only
-        if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-            req.fileValidationError = 'Only image files (jpg, jpeg, png, gif, webp) are allowed!';
-            return cb(null, false); // Reject file
+// Multer config for Excel upload (separate from images)
+const excelStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const excelDir = path.join(__dirname, '../../uploads');
+        if (!fs.existsSync(excelDir)) {
+            fs.mkdirSync(excelDir, { recursive: true });
         }
-        cb(null, true); // Accept file
+        cb(null, excelDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'bulk-products-' + uniqueSuffix + path.extname(file.originalname));
     }
-}).array('images', 10); // Accept up to 10 images per product
+});
+const uploadExcel = multer({
+    storage: excelStorage,
+    fileFilter: function (req, file, cb) {
+        if (!file.originalname.match(/\.(xlsx|xls)$/i)) {
+            req.fileValidationError = 'Doar fișiere Excel (.xlsx, .xls) sunt permise!';
+            return cb(null, false);
+        }
+        cb(null, true);
+    }
+}).single('excel');
+
+// @route   POST /api/products/bulk-upload
+// @desc    Bulk upload products from Excel
+// @access  Private (admin only)
+router.post('/bulk-upload', verifyAdmin, (req, res) => {
+    uploadExcel(req, res, async function (err) {
+        if (req.fileValidationError) {
+            return res.status(400).json({ success: false, message: req.fileValidationError });
+        }
+        if (err instanceof multer.MulterError) {
+            return res.status(500).json({ success: false, message: `Multer error: ${err.message}` });
+        }
+        if (err) {
+            return res.status(500).json({ success: false, message: `Unknown upload error: ${err.message}` });
+        }
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'Fișierul Excel este necesar.' });
+        }
+
+        try {
+            // Parse Excel
+            const workbook = xlsx.readFile(req.file.path);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = xlsx.utils.sheet_to_json(sheet);
+
+            if (!Array.isArray(rows) || rows.length === 0) {
+                return res.status(400).json({ success: false, message: 'Fișierul Excel nu conține date.' });
+            }            // Mapare și inserare produse
+            let created = 0, failed = 0, errors = [];
+            for (const row of rows) {
+                try {
+                    // Verifică câmpurile obligatorii
+                    const name = row.name || row.Name;
+                    const description = row.description || row.Description;
+                    const price = row.price || row.Price;
+                    const stock = row.stock || row.Stock;
+                    const categoryName = row.category || row.Category || row.CategoryName;
+
+                    if (!name) throw new Error('Câmpul "Name" este obligatoriu.');
+                    if (!description) throw new Error('Câmpul "Description" este obligatoriu.');
+                    if (!price && price !== 0) throw new Error('Câmpul "Price" este obligatoriu.');
+                    if (!stock && stock !== 0) throw new Error('Câmpul "Stock" este obligatoriu.');
+                    if (!categoryName) throw new Error('Câmpul "CategoryName" este obligatoriu.');
+
+                    // Caută categoria după nume
+                    let categoryId = null;
+                    const category = await Category.findOne({ name: categoryName });
+                    if (!category) throw new Error(`Categoria '${categoryName}' nu există în sistem.`);
+                    categoryId = category._id;
+
+                    // Creează produsul cu toate câmpurile disponibile
+                    const productData = {
+                        name,
+                        description,
+                        price: Number(price),
+                        stock: Number(stock),
+                        category: categoryId,
+                        status: row.status || row.Status || 'draft',
+                        images: ['uploads/default/no-photo.jpg']
+                    };
+
+                    // Adaugă câmpurile opționale doar dacă sunt prezente
+                    // Parse Specifications (JSON string) - OPȚIONAL
+                    if (row.specifications || row.Specifications) {
+                        try {
+                            const specStr = row.specifications || row.Specifications;
+                            if (specStr && specStr.trim()) {
+                                productData.specifications = typeof specStr === 'string' ? JSON.parse(specStr) : specStr;
+                            }
+                        } catch (e) {
+                            console.warn(`JSON invalid pentru specifications la produsul ${name}:`, e.message);
+                            // Nu oprește procesarea, doar ignoră acest câmp
+                        }
+                    }
+
+                    // Parse Instructions (JSON array) - OPȚIONAL
+                    if (row.instructions || row.Instructions) {
+                        try {
+                            const instrStr = row.instructions || row.Instructions;
+                            if (instrStr && instrStr.trim()) {
+                                productData.instructions = typeof instrStr === 'string' ? JSON.parse(instrStr) : instrStr;
+                            }
+                        } catch (e) {
+                            console.warn(`JSON invalid pentru instructions la produsul ${name}:`, e.message);
+                        }
+                    }
+
+                    // Shipping and Returns - OPȚIONAL
+                    if (row.shippingAndReturns || row.ShippingAndReturns) {
+                        const shippingStr = row.shippingAndReturns || row.ShippingAndReturns;
+                        if (shippingStr && shippingStr.trim()) {
+                            productData.shippingAndReturns = shippingStr;
+                        }
+                    }
+
+                    // Parse Key Features (JSON array) - OPȚIONAL
+                    if (row.keyFeatures || row.KeyFeatures) {
+                        try {
+                            const featStr = row.keyFeatures || row.KeyFeatures;
+                            if (featStr && featStr.trim()) {
+                                productData.keyFeatures = typeof featStr === 'string' ? JSON.parse(featStr) : featStr;
+                            }
+                        } catch (e) {
+                            console.warn(`JSON invalid pentru keyFeatures la produsul ${name}:`, e.message);
+                        }
+                    }
+
+                    // Parse Colors (JSON array) - OPȚIONAL
+                    if (row.colors || row.Colors) {
+                        try {
+                            const colorsStr = row.colors || row.Colors;
+                            if (colorsStr && colorsStr.trim()) {
+                                productData.colors = typeof colorsStr === 'string' ? JSON.parse(colorsStr) : colorsStr;
+                            }
+                        } catch (e) {
+                            console.warn(`JSON invalid pentru colors la produsul ${name}:`, e.message);
+                        }
+                    }
+
+                    // Is Recommended (boolean) - OPȚIONAL
+                    if (row.isRecommended || row.IsRecommended) {
+                        const recValue = row.isRecommended || row.IsRecommended;
+                        productData.isRecommended = recValue === 'true' || recValue === true || recValue === 1;
+                    }
+
+                    await Product.create(productData);
+                    created++;
+                } catch (e) {
+                    failed++;
+                    errors.push({ 
+                        row: `Rândul cu produsul "${row.name || row.Name || 'Necunoscut'}"`, 
+                        error: e.message 
+                    });
+                }
+            }
+
+
+            // Șterge fișierul Excel după procesare
+            fs.unlink(req.file.path, () => {});
+
+            res.json({
+                success: true,
+                message: `Bulk upload finalizat: ${created} produse create, ${failed} erori.`,
+                created,
+                failed,
+                errors
+            });
+        } catch (e) {
+            res.status(500).json({ success: false, message: 'Eroare la procesarea fișierului Excel.', error: e.message });
+        }
+    });
+});
 
 // @route   GET /api/products
 // @desc    Get all products
