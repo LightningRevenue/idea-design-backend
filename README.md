@@ -181,7 +181,7 @@ După ce instanța EC2 este `running`, conectează-te la ea.
 
         # Reverse Proxy către aplicația Express
         location / {
-            proxy_pass http://localhost:3000; # <-- ASIGURĂ-TE CĂ 3000 ESTE PORTUL PE CARE ASCULTĂ EXPRESS-UL TĂU!
+            proxy_pass https://idea-design-backend-fbfbcjg6grgvfght.westeurope-01.azurewebsites.net; # <-- ASIGURĂ-TE CĂ 3000 ESTE PORTUL PE CARE ASCULTĂ EXPRESS-UL TĂU!
             proxy_http_version 1.1;
             proxy_set_header Upgrade $http_upgrade;
             proxy_set_header Connection 'upgrade';
@@ -221,7 +221,7 @@ După ce instanța EC2 este `running`, conectează-te la ea.
         ```javascript
         const cors = require('cors');
         app.use(cors({
-            origin: 'http://localhost:3000' // Pentru dezvoltare frontend
+            origin: 'https://idea-design-backend-fbfbcjg6grgvfght.westeurope-01.azurewebsites.net' // Pentru dezvoltare frontend
             // SAU: origin: '[https://numeletaufrontend.com](https://numeletaufrontend.com)' // Pentru producție frontend
         }));
         ```
