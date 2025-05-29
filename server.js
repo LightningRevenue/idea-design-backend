@@ -31,7 +31,7 @@ const corsOptions = {
     'https://www.idea-design.ro',      // Production domain HTTPS
     'http://idea-design.ro',           // Production domain without www
     'https://idea-design.ro',
-    'https://purple-moss-02db17003.6.azurestaticapps.net/'           // Production domain without www HTTPS
+    'https://purple-moss-02db17003.6.azurestaticapps.net'           // Production domain without www HTTPS
   ],
   credentials: true,                   // Allow cookies and auth headers
   optionsSuccessStatus: 200           // Some legacy browsers choke on 204
