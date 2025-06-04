@@ -49,8 +49,7 @@ const ProductSchema = new mongoose.Schema({
   },
   keyFeatures: {
     type: [String] // Array of strings for key product features
-  },
-  colors: {
+  },  colors: {
     type: [
       {
         value: { type: String, required: true },
@@ -58,6 +57,31 @@ const ProductSchema = new mongoose.Schema({
       }
     ],
     default: []
+  },  youtubeUrl: {
+    type: String,
+    default: '',
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Allow empty string
+        // Validate YouTube URL format
+        const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/;
+        return youtubeRegex.test(v);
+      },
+      message: 'Please provide a valid YouTube URL'
+    }
+  },
+  technicalDatasheetUrl: {
+    type: String,
+    default: '',
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Allow empty string
+        // Validate URL format for PDFs
+        const urlRegex = /^(https?:\/\/)[\w\-\.]+\.[a-zA-Z]{2,}(\/.*)?$/;
+        return urlRegex.test(v);
+      },
+      message: 'Please provide a valid URL for the technical datasheet'
+    }
   },
   isRecommended: { // Added field for recommended products
     type: Boolean,

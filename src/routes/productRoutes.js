@@ -448,14 +448,10 @@ router.post('/', verifyAdmin, (req, res) => {
         }
         if (err) {
             return res.status(500).json({ success: false, message: `Unknown upload error: ${err.message}` });
-        }
-
-        try {
+        }        try {
             console.log('POST /api/products hit on backend');
             console.log('Request Body:', req.body);
-            console.log('Request Files (from multer):', req.files);
-
-            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors } = req.body;
+            console.log('Request Files (from multer):', req.files);            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
 
             if (!name || !description || !price || !stock || !category) {
                 return res.status(400).json({ success: false, message: 'Please provide all required fields: name, description, price, stock, category' });
@@ -489,9 +485,10 @@ router.post('/', verifyAdmin, (req, res) => {
                 images,
                 specifications: specifications ? JSON.parse(specifications) : {},
                 instructions: instructions ? JSON.parse(instructions) : [],
-                shippingAndReturns: shippingAndReturns || '',
-                keyFeatures: keyFeatures ? JSON.parse(keyFeatures) : [],
-                colors: parsedColors
+                shippingAndReturns: shippingAndReturns || '',                keyFeatures: keyFeatures ? JSON.parse(keyFeatures) : [],
+                colors: parsedColors,
+                youtubeUrl: youtubeUrl || '',
+                technicalDatasheetUrl: technicalDatasheetUrl || ''
             });
 
             const savedProduct = await newProduct.save();
@@ -553,10 +550,8 @@ router.put('/:id', verifyAdmin, (req, res) => {
             const existingProduct = await Product.findById(productId);
             if (!existingProduct) {
                 return res.status(404).json({ success: false, message: 'Product not found' });
-            }
-
-            // Extract fields from the request body
-            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors } = req.body;
+            }            // Extract fields from the request body
+            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
 
             // Basic validation of required fields
             if (!name || !description || !price || !stock || !category) {
@@ -601,9 +596,7 @@ router.put('/:id', verifyAdmin, (req, res) => {
                 } catch (e) {
                     return res.status(400).json({ success: false, message: 'Invalid JSON format for keyFeatures.' });
                 }
-            }
-
-            if (colors !== undefined) {
+            }            if (colors !== undefined) {
                 let parsedColors = [];
                 let arr = typeof colors === 'string' ? JSON.parse(colors) : colors;
                 parsedColors = arr.map(c => {
@@ -612,7 +605,15 @@ router.put('/:id', verifyAdmin, (req, res) => {
                     return { value: '', name: '' };
                 });
                 updateData.colors = parsedColors;
-            }            // Handle images update with better management
+            }            if (youtubeUrl !== undefined) {
+                updateData.youtubeUrl = youtubeUrl || '';
+            }
+
+            if (technicalDatasheetUrl !== undefined) {
+                updateData.technicalDatasheetUrl = technicalDatasheetUrl || '';
+            }
+
+            // Handle images update with better management
             const { currentImages } = req.body;
             let finalImages = [];
 
