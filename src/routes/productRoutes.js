@@ -612,28 +612,48 @@ router.put('/:id', verifyAdmin, (req, res) => {
                     return { value: '', name: '' };
                 });
                 updateData.colors = parsedColors;
+            }            // Handle images update with better management
+            const { currentImages } = req.body;
+            let finalImages = [];
+
+            // If currentImages is provided, it means frontend is managing image order and deletions
+            if (currentImages) {
+                try {
+                    const parsedCurrentImages = JSON.parse(currentImages);
+                    finalImages = [...parsedCurrentImages];
+                } catch (e) {
+                    console.error('Error parsing currentImages:', e);
+                    finalImages = [...existingProduct.images];
+                }
+            } else {
+                // Fallback: keep existing images
+                finalImages = [...existingProduct.images];
             }
 
-
-            // Handle images update
+            // Add new images if uploaded
             if (req.files && req.files.length > 0) {
-                // Delete all old images except default
+                const newImagePaths = req.files.map(file => `uploads/product_images/${file.filename}`.replace(/\\/g, '/'));
+                finalImages = [...finalImages, ...newImagePaths];
+            }
+
+            // Update images in database
+            if (currentImages || (req.files && req.files.length > 0)) {
+                updateData.images = finalImages;
+                
+                // Clean up orphaned images (images that were in existingProduct but not in finalImages)
                 if (Array.isArray(existingProduct.images)) {
                     existingProduct.images.forEach(imgPath => {
-                        if (imgPath && !imgPath.includes('no-photo.jpg')) {
+                        if (imgPath && !imgPath.includes('no-photo.jpg') && !finalImages.includes(imgPath)) {
                             const oldImagePath = path.join(__dirname, '../../', imgPath);
                             fs.unlink(oldImagePath, (unlinkErr) => {
-                                if (unlinkErr && !unlinkErr.code === 'ENOENT') {
-                                    console.error("Error deleting old product image:", unlinkErr);
+                                if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+                                    console.error("Error deleting orphaned product image:", unlinkErr);
                                 }
                             });
                         }
                     });
                 }
-                // Set new images
-                updateData.images = req.files.map(file => `uploads/product_images/${file.filename}`.replace(/\\/g, '/'));
             }
-            // If no new images uploaded, keep the existing images (don't set images field in updateData)
 
             console.log('Updating product with data:', updateData);
             // Update the product in the database

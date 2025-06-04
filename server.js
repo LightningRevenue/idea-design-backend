@@ -14,6 +14,7 @@ const orderRoutes = require('./src/routes/orderRoutes'); // Import order routes
 const consultationQuestionRoutes = require('./src/routes/consultationQuestionRoutes'); // Import consultation question routes
 const consultationRoutes = require('./src/routes/consultationRoutes'); // Import consultation routes
 const architectPartnershipRoutes = require('./src/routes/architectPartnershipRoutes'); // Import architect partnership routes
+const bulkImportRoutes = require('./src/routes/bulkImportRoutes'); // Import bulk import routes
 
 // Load environment variables
 dotenv.config();
@@ -66,6 +67,7 @@ app.use('/api/orders', orderRoutes); // Add order routes
 app.use('/api/intrebari-consultanta', consultationQuestionRoutes); // Add consultation question routes
 app.use('/api/consultatii', consultationRoutes); // Add consultation routes
 app.use('/api/architect-partnerships', architectPartnershipRoutes); // Add architect partnership routes
+app.use('/api/bulk-import', bulkImportRoutes); // Add bulk import routes
 
 // Base route
 app.get('/', (req, res) => {
