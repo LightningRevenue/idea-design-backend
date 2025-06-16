@@ -194,6 +194,27 @@ router.get('/recommended', async (req, res) => {
     }
 });
 
+// @route   GET /api/products/admin/all
+// @desc    Get all products (for admin use - includes draft, archived, etc.)
+// @access  Private (admin only)
+router.get('/admin/all', verifyAdmin, async (req, res) => {
+  try {
+    // Fetch ALL products regardless of status for admin panel
+    const products = await Product.find().populate('category', 'name').sort({ createdAt: -1 });
+    
+    console.log('GET /api/products/admin/all - Fetched all products:', products.length); 
+
+    res.json({
+      success: true,
+      count: products.length,
+      data: products 
+    });
+  } catch (err) {
+    console.error('Error in GET /api/products/admin/all:', err.message);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
 // Multer config for Excel upload (separate from images)
 const excelStorage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -377,10 +398,20 @@ router.post('/bulk-upload', verifyAdmin, (req, res) => {
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    // Fetch products and populate the 'category' field to get category details
-    const products = await Product.find().populate('category', 'name'); // Populate only name field of category
+    // Check if this is an admin request (has admin authorization)
+    const isAdminRequest = req.headers.authorization && req.headers.authorization.startsWith('Bearer');
     
-    console.log('GET /api/products - Fetched products:', products.length); 
+    let query = {};
+    
+    // If it's not an admin request, only show active products
+    if (!isAdminRequest) {
+      query.status = 'active';
+    }
+    
+    // Fetch products and populate the 'category' field to get category details
+    const products = await Product.find(query).populate('category', 'name'); // Populate only name field of category
+    
+    console.log('GET /api/products - Fetched products:', products.length, isAdminRequest ? '(admin)' : '(public)'); 
 
     res.json({
       success: true,
