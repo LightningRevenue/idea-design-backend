@@ -582,7 +582,7 @@ router.put('/:id', verifyAdmin, (req, res) => {
             if (!existingProduct) {
                 return res.status(404).json({ success: false, message: 'Product not found' });
             }            // Extract fields from the request body
-            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
+            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, isRecommended } = req.body;
 
             // Basic validation of required fields
             if (!name || !description || !price || !stock || !category) {
@@ -600,6 +600,11 @@ router.put('/:id', verifyAdmin, (req, res) => {
                 // specifications, instructions, and shippingAndReturns will be handled separately
                 // to allow for partial updates and correct parsing if they are sent as JSON strings
             };
+
+            // Handle isRecommended field
+            if (isRecommended !== undefined) {
+                updateData.isRecommended = Boolean(isRecommended);
+            }
 
             if (specifications !== undefined) {
                 try {
@@ -764,6 +769,56 @@ router.delete('/:id', verifyAdmin, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid product ID format' });
         }
         res.status(500).json({ success: false, message: 'Server Error while deleting product' });
+    }
+});
+
+// @route   PATCH /api/products/:id/recommended
+// @desc    Toggle recommended status for a product
+// @access  Private (admin only)
+router.patch('/:id/recommended', verifyAdmin, async (req, res) => {
+    console.log(`PATCH /api/products/:id/recommended route hit with ID: ${req.params.id}`);
+    try {
+        const productId = req.params.id;
+        const { isRecommended } = req.body;
+        
+        // Validate if the ID is a valid MongoDB ObjectId
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: 'Invalid product ID format' });
+        }
+
+        // Validate isRecommended field
+        if (isRecommended === undefined) {
+            return res.status(400).json({ success: false, message: 'isRecommended field is required' });
+        }
+
+        console.log(`Updating product ${productId} - isRecommended: ${isRecommended}`);
+        
+        // Update only the isRecommended field
+        const updatedProduct = await Product.findByIdAndUpdate(
+            productId,
+            { isRecommended: Boolean(isRecommended) },
+            { new: true, runValidators: true }
+        ).populate('category', 'name');
+
+        if (!updatedProduct) {
+            return res.status(404).json({ success: false, message: 'Product not found' });
+        }
+
+        console.log(`Product updated successfully: ${updatedProduct.name} - recommended: ${updatedProduct.isRecommended}`);
+        
+        res.json({
+            success: true,
+            message: 'Product recommendation status updated successfully',
+            data: updatedProduct
+        });
+
+    } catch (err) {
+        console.error('Error in PATCH /api/products/:id/recommended:', err.message, err);
+        // Check for CastError (often from invalid ID format)
+        if (err.name === 'CastError' && err.kind === 'ObjectId') {
+            return res.status(400).json({ success: false, message: 'Invalid product ID format during update' });
+        }
+        res.status(500).json({ success: false, message: 'Server Error while updating product recommendation status' });
     }
 });
 
