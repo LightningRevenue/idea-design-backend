@@ -424,42 +424,45 @@ router.get('/', async (req, res) => {
   }
 });
 
-// @route   GET /api/products/:id
-// @desc    Get a single product by ID
+// @route   GET /api/products/:identifier
+// @desc    Get a single product by ID or slug
 // @access  Public
-router.get('/:id', async (req, res) => {
-    console.log(`GET /api/products/:id route hit with ID: ${req.params.id}`);
+router.get('/:identifier', async (req, res) => {
+    console.log(`GET /api/products/:identifier route hit with identifier: ${req.params.identifier}`);
     
     // Check if this is actually the recommended route that's being caught (shouldn't happen but just to be safe)
-    if (req.params.id === 'recommended') {
+    if (req.params.identifier === 'recommended') {
         console.log('Redirecting /recommended to the correct handler');
         return res.redirect('/api/products/recommended');
     }
     
     try {
-        const productId = req.params.id;
-        // Validate if the ID is a valid MongoDB ObjectId before querying
-        if (!mongoose.Types.ObjectId.isValid(productId)) {
-            console.log(`Invalid ObjectId format for ID: ${productId}`);
-            return res.status(400).json({ success: false, message: 'Invalid product ID format' });
+        const identifier = req.params.identifier;
+        let product = null;
+        
+        // First try to find by slug
+        console.log(`Attempting to find product by slug: ${identifier}`);
+        product = await Product.findOne({ slug: identifier }).populate('category', 'name');
+        
+        // If not found by slug and identifier looks like a valid ObjectId, try by ID
+        if (!product && mongoose.Types.ObjectId.isValid(identifier)) {
+            console.log(`Slug not found, attempting to find product by ID: ${identifier}`);
+            product = await Product.findById(identifier).populate('category', 'name');
         }
 
-        console.log(`Attempting to find product with ID: ${productId}`);
-        const product = await Product.findById(productId).populate('category', 'name');
-
         if (!product) {
-            console.log(`Product with ID ${productId} not found in database.`);
+            console.log(`Product with identifier ${identifier} not found in database.`);
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
 
-        console.log(`Product found: ${product.name}`);
+        console.log(`Product found: ${product.name} (slug: ${product.slug})`);
         res.json({ success: true, data: product });
 
     } catch (err) {
-        console.error(`Error in GET /api/products/${req.params.id}: ${err.message}`, err);
+        console.error(`Error in GET /api/products/${req.params.identifier}: ${err.message}`, err);
         // More specific error check for CastError (often from invalid ID format during query)
         if (err.name === 'CastError' && err.kind === 'ObjectId') {
-             console.error(`CastError: Invalid ObjectId format during findById for ID ${req.params.id}`);
+             console.error(`CastError: Invalid ObjectId format during findById for ID ${req.params.identifier}`);
             return res.status(400).json({ success: false, message: 'Invalid product ID format during query' });
         }
         res.status(500).json({ success: false, message: 'Server Error while fetching product' });

@@ -87,16 +87,49 @@ const ProductSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  slug: {
+    type: String,
+    unique: true,
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Middleware to create a slug from the name before saving (optional but good for SEO-friendly URLs)
-// ProductSchema.pre('save', function(next) {
-//   this.slug = this.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
-//   next();
-// });
+// Function to create slug from text (similar to frontend)
+function createSlug(text) {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/[ăâ]/g, 'a')
+    .replace(/[îí]/g, 'i')
+    .replace(/[șş]/g, 's')
+    .replace(/[țţ]/g, 't')
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-+/, '') // Remove leading hyphens
+    .replace(/-+$/, ''); // Remove trailing hyphens
+}
+
+// Middleware to create a slug from the name before saving
+ProductSchema.pre('save', async function(next) {
+  if (this.isModified('name') || this.isNew) {
+    let baseSlug = createSlug(this.name);
+    let slug = baseSlug;
+    let counter = 1;
+    
+    // Check if slug already exists and make it unique
+    while (await mongoose.model('Product').findOne({ slug, _id: { $ne: this._id } })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    
+    this.slug = slug;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Product', ProductSchema);
