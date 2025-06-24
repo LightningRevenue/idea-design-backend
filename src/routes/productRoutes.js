@@ -52,6 +52,7 @@ router.get('/download-template', verifyAdmin, (req, res) => {
         const templateData = [
             {
                 'Name': 'Rochie Elegantă Neagră',
+                'Brand': 'Elegance Pro',
                 'Description': 'Rochie elegantă din voal negru, perfectă pentru evenimente speciale. Design modern cu croiala feminină.',
                 'Price': 299.99,
                 'Stock': 15,
@@ -66,6 +67,7 @@ router.get('/download-template', verifyAdmin, (req, res) => {
             },
             {
                 'Name': 'Tricou Casual Alb',
+                'Brand': 'Comfort Style',
                 'Description': 'Tricou din bumbac 100%, confortabil pentru purtarea zilnică. Design simplu și versatil.',
                 'Price': 49.99,
                 'Stock': 25,
@@ -80,6 +82,7 @@ router.get('/download-template', verifyAdmin, (req, res) => {
             },
             {
                 'Name': 'Pantaloni Eleganți Bleumarin',
+                'Brand': 'Office Elite',
                 'Description': 'Pantaloni eleganți din material premium, potriviți pentru birou și ocazii speciale.',
                 'Price': 179.99,
                 'Stock': 12,
@@ -100,6 +103,7 @@ router.get('/download-template', verifyAdmin, (req, res) => {
         // Create instructions worksheet
         const instructionsData = [
             { 'Câmp': 'Name', 'Tip': 'OBLIGATORIU', 'Descriere': 'Numele produsului', 'Exemplu': 'Rochie Elegantă Neagră', 'Observații': 'Maxim 100 caractere' },
+            { 'Câmp': 'Brand', 'Tip': 'OPȚIONAL', 'Descriere': 'Brandul produsului', 'Exemplu': 'Elegance Pro', 'Observații': 'Maxim 50 caractere' },
             { 'Câmp': 'Description', 'Tip': 'OBLIGATORIU', 'Descriere': 'Descrierea detaliată', 'Exemplu': 'Rochie din voal negru...', 'Observații': 'Maxim 1000 caractere' },
             { 'Câmp': 'Price', 'Tip': 'OBLIGATORIU', 'Descriere': 'Prețul în RON', 'Exemplu': '299.99', 'Observații': 'Doar numere cu punctul ca separator' },
             { 'Câmp': 'Stock', 'Tip': 'OBLIGATORIU', 'Descriere': 'Cantitatea în stoc', 'Exemplu': '15', 'Observații': 'Doar numere întregi' },
@@ -293,6 +297,7 @@ router.post('/bulk-upload', verifyAdmin, (req, res) => {
                     // Creează produsul cu toate câmpurile disponibile
                     const productData = {
                         name,
+                        brand: row.brand || row.Brand || '',
                         description,
                         price: Number(price),
                         stock: Number(stock),
@@ -485,7 +490,7 @@ router.post('/', verifyAdmin, (req, res) => {
         }        try {
             console.log('POST /api/products hit on backend');
             console.log('Request Body:', req.body);
-            console.log('Request Files (from multer):', req.files);            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
+            console.log('Request Files (from multer):', req.files);            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
 
             if (!name || !description || !price || !stock || !category) {
                 return res.status(400).json({ success: false, message: 'Please provide all required fields: name, description, price, stock, category' });
@@ -511,6 +516,7 @@ router.post('/', verifyAdmin, (req, res) => {
 
             const newProduct = new Product({
                 name,
+                brand: brand || '',
                 description,
                 price: parseFloat(price),
                 stock: parseInt(stock, 10),
@@ -585,7 +591,7 @@ router.put('/:id', verifyAdmin, (req, res) => {
             if (!existingProduct) {
                 return res.status(404).json({ success: false, message: 'Product not found' });
             }            // Extract fields from the request body
-            const { name, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, isRecommended } = req.body;
+            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, isRecommended } = req.body;
 
             // Basic validation of required fields
             if (!name || !description || !price || !stock || !category) {
@@ -595,6 +601,7 @@ router.put('/:id', verifyAdmin, (req, res) => {
             // Build the update object for the product
             const updateData = {
                 name,
+                brand: brand || '',
                 description,
                 price: parseFloat(price),
                 stock: parseInt(stock, 10),
@@ -822,6 +829,314 @@ router.patch('/:id/recommended', verifyAdmin, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid product ID format during update' });
         }
         res.status(500).json({ success: false, message: 'Server Error while updating product recommendation status' });
+    }
+});
+
+// @route   PATCH /api/products/bulk-edit
+// @desc    Bulk edit multiple products
+// @access  Private (admin only)
+router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
+    console.log('PATCH /api/products/bulk-edit route hit');
+    try {
+        const { productIds, updates } = req.body;
+
+        // Validate input
+        if (!Array.isArray(productIds) || productIds.length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'productIds array is required and cannot be empty' 
+            });
+        }
+
+        if (!updates || typeof updates !== 'object') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'updates object is required' 
+            });
+        }
+
+        // Validate all product IDs
+        for (const id of productIds) {
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Invalid product ID format: ${id}` 
+                });
+            }
+        }
+
+        console.log(`Bulk updating ${productIds.length} products with updates:`, updates);
+
+        // Build update object
+        const updateData = {};
+
+        // Handle basic fields
+        if (updates.price !== undefined) {
+            updateData.price = parseFloat(updates.price);
+            if (isNaN(updateData.price) || updateData.price < 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid price value' 
+                });
+            }
+        }
+
+        if (updates.stock !== undefined) {
+            updateData.stock = parseInt(updates.stock, 10);
+            if (isNaN(updateData.stock) || updateData.stock < 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid stock value' 
+                });
+            }
+        }
+
+        if (updates.status !== undefined) {
+            if (!['active', 'draft', 'archived'].includes(updates.status)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid status value. Must be active, draft, or archived' 
+                });
+            }
+            updateData.status = updates.status;
+        }
+
+        if (updates.category !== undefined) {
+            if (!mongoose.Types.ObjectId.isValid(updates.category)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid category ID format' 
+                });
+            }
+            updateData.category = updates.category;
+        }
+
+        if (updates.brand !== undefined) {
+            updateData.brand = updates.brand;
+        }
+
+        if (updates.isRecommended !== undefined) {
+            updateData.isRecommended = Boolean(updates.isRecommended);
+        }
+
+        if (updates.description !== undefined) {
+            updateData.description = updates.description;
+        }
+
+        if (updates.youtubeUrl !== undefined) {
+            updateData.youtubeUrl = updates.youtubeUrl;
+        }
+
+        if (updates.technicalDatasheetUrl !== undefined) {
+            updateData.technicalDatasheetUrl = updates.technicalDatasheetUrl;
+        }
+
+        // Handle colors merging
+        if (updates.colors !== undefined) {
+            try {
+                const newColors = Array.isArray(updates.colors) 
+                    ? updates.colors 
+                    : JSON.parse(updates.colors);
+                
+                if (!Array.isArray(newColors)) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'colors must be an array' 
+                    });
+                }
+
+                // For bulk edit, we merge colors intelligently (avoid duplicates)
+                const existingProducts = await Product.find({ _id: { $in: productIds } });
+                
+                const bulkUpdatePromises = productIds.map(async (productId) => {
+                    const existingProduct = existingProducts.find(p => p._id.toString() === productId);
+                    if (!existingProduct) return null;
+
+                    const existingColors = existingProduct.colors || [];
+                    
+                    // Only add new colors if they don't already exist (based on value)
+                    const existingColorValues = existingColors.map(c => c.value);
+                    const uniqueNewColors = newColors.filter(newColor => 
+                        !existingColorValues.includes(newColor.value)
+                    );
+                    
+                    const mergedColors = [...existingColors, ...uniqueNewColors];
+                    
+                    const productUpdateData = { 
+                        ...updateData, 
+                        colors: mergedColors 
+                    };
+
+                    return Product.findByIdAndUpdate(
+                        productId,
+                        productUpdateData,
+                        { new: true, runValidators: true }
+                    ).populate('category', 'name');
+                });
+
+                const updatedProducts = await Promise.all(bulkUpdatePromises);
+                const successfulUpdates = updatedProducts.filter(p => p !== null);
+
+                return res.json({
+                    success: true,
+                    message: `Successfully updated ${successfulUpdates.length} products`,
+                    data: successfulUpdates
+                });
+
+            } catch (e) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid JSON format for colors' 
+                });
+            }
+        }
+
+        // Handle specifications merging
+        if (updates.specifications !== undefined) {
+            try {
+                const newSpecs = typeof updates.specifications === 'string' 
+                    ? JSON.parse(updates.specifications) 
+                    : updates.specifications;
+                
+                // For bulk edit, we merge specifications instead of replacing them
+                const existingProducts = await Product.find({ _id: { $in: productIds } });
+                
+                // We'll handle specifications merge differently for each product
+                // So we'll process each product individually
+                const bulkUpdatePromises = productIds.map(async (productId) => {
+                    const existingProduct = existingProducts.find(p => p._id.toString() === productId);
+                    if (!existingProduct) return null;
+
+                    const mergedSpecs = { 
+                        ...(existingProduct.specifications || {}), 
+                        ...newSpecs 
+                    };
+                    
+                    const productUpdateData = { 
+                        ...updateData, 
+                        specifications: mergedSpecs 
+                    };
+
+                    return Product.findByIdAndUpdate(
+                        productId,
+                        productUpdateData,
+                        { new: true, runValidators: true }
+                    ).populate('category', 'name');
+                });
+
+                const updatedProducts = await Promise.all(bulkUpdatePromises);
+                const successfulUpdates = updatedProducts.filter(p => p !== null);
+
+                return res.json({
+                    success: true,
+                    message: `Successfully updated ${successfulUpdates.length} products`,
+                    data: successfulUpdates
+                });
+
+            } catch (e) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid JSON format for specifications' 
+                });
+            }
+        }
+
+        // Handle key features merging
+        if (updates.keyFeatures !== undefined) {
+            try {
+                const newFeatures = typeof updates.keyFeatures === 'string' 
+                    ? JSON.parse(updates.keyFeatures) 
+                    : updates.keyFeatures;
+                
+                if (!Array.isArray(newFeatures)) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'keyFeatures must be an array' 
+                    });
+                }
+
+                // For bulk edit, we merge key features
+                const existingProducts = await Product.find({ _id: { $in: productIds } });
+                
+                const bulkUpdatePromises = productIds.map(async (productId) => {
+                    const existingProduct = existingProducts.find(p => p._id.toString() === productId);
+                    if (!existingProduct) return null;
+
+                    const existingFeatures = existingProduct.keyFeatures || [];
+                    const mergedFeatures = [...new Set([...existingFeatures, ...newFeatures])]; // Remove duplicates
+                    
+                    const productUpdateData = { 
+                        ...updateData, 
+                        keyFeatures: mergedFeatures 
+                    };
+
+                    return Product.findByIdAndUpdate(
+                        productId,
+                        productUpdateData,
+                        { new: true, runValidators: true }
+                    ).populate('category', 'name');
+                });
+
+                const updatedProducts = await Promise.all(bulkUpdatePromises);
+                const successfulUpdates = updatedProducts.filter(p => p !== null);
+
+                return res.json({
+                    success: true,
+                    message: `Successfully updated ${successfulUpdates.length} products`,
+                    data: successfulUpdates
+                });
+
+            } catch (e) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid JSON format for keyFeatures' 
+                });
+            }
+        }
+
+        // For simple updates (no complex merging)
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No valid update fields provided' 
+            });
+        }
+
+        // Perform bulk update
+        const updateResult = await Product.updateMany(
+            { _id: { $in: productIds } },
+            updateData,
+            { runValidators: true }
+        );
+
+        // Fetch updated products
+        const updatedProducts = await Product.find({ 
+            _id: { $in: productIds } 
+        }).populate('category', 'name');
+
+        console.log(`Bulk update completed. Modified: ${updateResult.modifiedCount} products`);
+
+        res.json({
+            success: true,
+            message: `Successfully updated ${updateResult.modifiedCount} products`,
+            data: updatedProducts
+        });
+
+    } catch (err) {
+        console.error('Error in PATCH /api/products/bulk-edit:', err.message, err);
+        
+        if (err.name === 'ValidationError') {
+            const messages = Object.values(err.errors).map(val => val.message);
+            return res.status(400).json({ 
+                success: false, 
+                message: messages.join(', ') 
+            });
+        }
+        
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server Error while bulk updating products' 
+        });
     }
 });
 

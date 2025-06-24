@@ -7,6 +7,7 @@ const path = require('path');
 // Import routes
 const productRoutes = require('./src/routes/productRoutes');
 const categoryRoutes = require('./src/routes/categoryRoutes');
+const brandRoutes = require('./src/routes/brandRoutes'); // Import brand routes
 const adminRoutes = require('./src/routes/adminRoutes');
 const userRoutes = require('./src/routes/userRoutes'); // Added user routes
 const cartRoutes = require('./src/routes/cartRoutes');
@@ -60,6 +61,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/brands', brandRoutes); // Add brand routes
 app.use('/api/admin', adminRoutes); // Admin login/signup
 app.use('/api/users', userRoutes); // Added user routes
 app.use('/api/cart', cartRoutes);
