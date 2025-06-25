@@ -11,6 +11,27 @@ const {
 } = require('../controllers/categoryController');
 const { verifyAdmin } = require('../middleware/adminAuth');
 
+// Middleware pentru compresie imagini categorii
+const uploadAndCompress = (req, res, next) => {
+  upload.single('image')(req, res, async (err) => {
+    if (err) {
+      return next(err);
+    }
+    
+    // Aplică compresie dacă există un fișier încărcat
+    if (req.file) {
+      // Transformă req.file în req.files pentru a fi compatibil cu compressImages
+      req.files = [req.file];
+      await compressImages(req, res, () => {});
+      // Returnează la req.file pentru compatibilitate
+      req.file = req.files[0];
+      delete req.files;
+    }
+    
+    next();
+  });
+};
+
 // Get all categories & Create a new category
 router.route('/')
   .get(getCategories)

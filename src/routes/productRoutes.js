@@ -7,42 +7,10 @@ const fs = require('fs');
 const mongoose = require('mongoose'); // Make sure this is at the top with other requires
 const { verifyAdmin } = require('../middleware/adminAuth');
 const upload = require('../middleware/upload'); // This is for categories, will be unused for product image uploads now
+const { uploadAndCompressProductImages } = require('../middleware/productImageUpload'); // Import dedicated product upload middleware
 const multer = require('multer'); // Import multer
 const xlsx = require('xlsx');
 const { v4: uuidv4 } = require('uuid'); // For unique filenames
-
-// --- Multer configuration for Product Images ---
-const productImagesDir = path.join(__dirname, '../../uploads/product_images');
-if (!fs.existsSync(productImagesDir)) {
-    fs.mkdirSync(productImagesDir, { recursive: true });
-}
-
-const productImageStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, productImagesDir);
-    },
-    filename: (req, file, cb) => {
-        const fileName = uuidv4() + path.extname(file.originalname);
-        cb(null, fileName);
-    }
-});
-
-const productImageFileFilter = (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        req.fileValidationError = 'Tip de fișier invalid. Sunt permise doar fișiere JPEG, PNG, JPG, WEBP.';
-        cb(null, false);
-    }
-};
-
-const productImagesUpload = multer({
-    storage: productImageStorage,
-    fileFilter: productImageFileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit per file
-}).array('images', 10); // Field name 'images', max 10 files
-// --- End Multer configuration for Product Images ---
 
 // @route   GET /api/products/download-template
 // @desc    Download Excel template for bulk upload
@@ -477,17 +445,8 @@ router.get('/:identifier', async (req, res) => {
 // @route   POST /api/products
 // @desc    Create a new product
 // @access  Private (admin only)
-router.post('/', verifyAdmin, (req, res) => {
-    productImagesUpload(req, res, async function (err) {
-        if (req.fileValidationError) {
-            return res.status(400).json({ success: false, message: req.fileValidationError });
-        }
-        if (err instanceof multer.MulterError) {
-            return res.status(500).json({ success: false, message: `Multer error: ${err.message}` });
-        }
-        if (err) {
-            return res.status(500).json({ success: false, message: `Unknown upload error: ${err.message}` });
-        }        try {
+router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) => {
+        try {
             console.log('POST /api/products hit on backend');
             console.log('Request Body:', req.body);
             console.log('Request Files (from multer):', req.files);            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
@@ -556,27 +515,15 @@ router.post('/', verifyAdmin, (req, res) => {
             }
             res.status(500).json({ success: false, message: 'Server Error while creating product' });
         }
-    });
 });
 
 // @route   PUT /api/products/:id
 // @desc    Update a product by id
 // @access  Private (admin only)
-router.put('/:id', verifyAdmin, (req, res) => {
-    productImagesUpload(req, res, async function (err) {
-        if (req.fileValidationError) {
-            return res.status(400).json({ success: false, message: req.fileValidationError });
-        }
-        if (err instanceof multer.MulterError) {
-            return res.status(500).json({ success: false, message: `Multer error: ${err.message}` });
-        }
-        if (err) {
-            return res.status(500).json({ success: false, message: `Unknown upload error: ${err.message}` });
-        }
-
+router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res) => {
         console.log('PUT /api/products/:id route hit with ID:', req.params.id);
         console.log('Request Body:', req.body);
-        console.log('Request File (from multer):', req.file);
+        console.log('Request Files (from multer):', req.files);
 
         try {
             const productId = req.params.id;
@@ -729,7 +676,6 @@ router.put('/:id', verifyAdmin, (req, res) => {
             }
             res.status(500).json({ success: false, message: 'Server Error while updating product' });
         }
-    });
 });
 
 // @route   DELETE /api/products/:id
