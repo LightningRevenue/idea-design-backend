@@ -890,6 +890,32 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                         message: 'colors must be an array' 
                     });
                 }
+                
+                // Clean the colors array of any invalid items
+                const cleanColors = newColors
+                    .filter(color => {
+                        return color && 
+                               typeof color === 'object' &&
+                               color.value && 
+                               color.name &&
+                               typeof color.value === 'string' &&
+                               typeof color.name === 'string' &&
+                               color.value.trim().length > 0 &&
+                               color.name.trim().length > 0;
+                    })
+                    .map(color => ({
+                        value: color.value.trim(),
+                        name: color.name.trim()
+                    }));
+                
+                console.log('Cleaned colors:', cleanColors);
+                
+                if (cleanColors.length === 0) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'No valid colors provided after cleaning' 
+                    });
+                }
 
                 // For bulk edit, we merge colors intelligently (avoid duplicates)
                 const existingProducts = await Product.find({ _id: { $in: productIds } });
@@ -902,7 +928,7 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                     
                     // Only add new colors if they don't already exist (based on value)
                     const existingColorValues = existingColors.map(c => c.value);
-                    const uniqueNewColors = newColors.filter(newColor => 
+                    const uniqueNewColors = cleanColors.filter(newColor => 
                         !existingColorValues.includes(newColor.value)
                     );
                     
@@ -930,9 +956,10 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                 });
 
             } catch (e) {
+                console.error('Error processing colors:', e.message, e);
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Invalid JSON format for colors' 
+                    message: `Invalid JSON format for colors: ${e.message}` 
                 });
             }
         }
@@ -940,49 +967,70 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
         // Handle specifications merging
         if (updates.specifications !== undefined) {
             try {
-                const newSpecs = typeof updates.specifications === 'string' 
-                    ? JSON.parse(updates.specifications) 
-                    : updates.specifications;
+                console.log('Received specifications:', typeof updates.specifications, updates.specifications);
                 
-                // For bulk edit, we merge specifications instead of replacing them
-                const existingProducts = await Product.find({ _id: { $in: productIds } });
+                let newSpecs;
+                if (typeof updates.specifications === 'string') {
+                    newSpecs = JSON.parse(updates.specifications);
+                } else if (typeof updates.specifications === 'object' && updates.specifications !== null) {
+                    newSpecs = updates.specifications;
+                } else {
+                    throw new Error('Invalid specifications format - must be object or JSON string');
+                }
                 
-                // We'll handle specifications merge differently for each product
-                // So we'll process each product individually
-                const bulkUpdatePromises = productIds.map(async (productId) => {
-                    const existingProduct = existingProducts.find(p => p._id.toString() === productId);
-                    if (!existingProduct) return null;
+                // Clean the specifications object of any Mongoose-specific properties
+                const cleanSpecs = {};
+                for (const [key, value] of Object.entries(newSpecs)) {
+                    // Skip any keys that start with $ (Mongoose internal properties)
+                    if (!key.startsWith('$') && !key.startsWith('_') && typeof key === 'string' && key.trim().length > 0) {
+                        const cleanKey = key.trim();
+                        const cleanValue = typeof value === 'string' ? value.trim() : String(value).trim();
+                        if (cleanKey && cleanValue) {
+                            cleanSpecs[cleanKey] = cleanValue;
+                        }
+                    }
+                }
+                
+                console.log('Cleaned specifications:', cleanSpecs);
+                
+                // Only proceed if we have valid specifications to add
+                if (Object.keys(cleanSpecs).length === 0) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'No valid specifications provided after cleaning' 
+                    });
+                }
+                
+                // For bulk edit, we'll replace specifications entirely to avoid Mongoose Map issues
+                // Create a simple update object that replaces specifications completely
+                const specUpdateData = { 
+                    ...updateData, 
+                    specifications: cleanSpecs 
+                };
 
-                    const mergedSpecs = { 
-                        ...(existingProduct.specifications || {}), 
-                        ...newSpecs 
-                    };
-                    
-                    const productUpdateData = { 
-                        ...updateData, 
-                        specifications: mergedSpecs 
-                    };
+                // Use updateMany for simple replacement
+                const updateResult = await Product.updateMany(
+                    { _id: { $in: productIds } },
+                    specUpdateData,
+                    { runValidators: true }
+                );
 
-                    return Product.findByIdAndUpdate(
-                        productId,
-                        productUpdateData,
-                        { new: true, runValidators: true }
-                    ).populate('category', 'name');
-                });
-
-                const updatedProducts = await Promise.all(bulkUpdatePromises);
-                const successfulUpdates = updatedProducts.filter(p => p !== null);
+                // Fetch updated products
+                const updatedProducts = await Product.find({ 
+                    _id: { $in: productIds } 
+                }).populate('category', 'name');
 
                 return res.json({
                     success: true,
-                    message: `Successfully updated ${successfulUpdates.length} products`,
-                    data: successfulUpdates
+                    message: `Successfully updated ${updateResult.modifiedCount} products`,
+                    data: updatedProducts
                 });
 
             } catch (e) {
+                console.error('Error processing specifications:', e.message, e);
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Invalid JSON format for specifications' 
+                    message: `Invalid JSON format for specifications: ${e.message}` 
                 });
             }
         }
@@ -1000,6 +1048,20 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                         message: 'keyFeatures must be an array' 
                     });
                 }
+                
+                // Clean the features array of any invalid or empty items
+                const cleanFeatures = newFeatures
+                    .filter(feature => typeof feature === 'string' && feature.trim().length > 0)
+                    .map(feature => feature.trim());
+                
+                console.log('Cleaned keyFeatures:', cleanFeatures);
+                
+                if (cleanFeatures.length === 0) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'No valid key features provided after cleaning' 
+                    });
+                }
 
                 // For bulk edit, we merge key features
                 const existingProducts = await Product.find({ _id: { $in: productIds } });
@@ -1009,7 +1071,7 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                     if (!existingProduct) return null;
 
                     const existingFeatures = existingProduct.keyFeatures || [];
-                    const mergedFeatures = [...new Set([...existingFeatures, ...newFeatures])]; // Remove duplicates
+                    const mergedFeatures = [...new Set([...existingFeatures, ...cleanFeatures])]; // Remove duplicates
                     
                     const productUpdateData = { 
                         ...updateData, 
@@ -1033,9 +1095,10 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
                 });
 
             } catch (e) {
+                console.error('Error processing keyFeatures:', e.message, e);
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Invalid JSON format for keyFeatures' 
+                    message: `Invalid JSON format for keyFeatures: ${e.message}` 
                 });
             }
         }
