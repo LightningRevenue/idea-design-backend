@@ -17,7 +17,7 @@ router.use(verifyAdmin);
 
 // @route   GET /api/offers
 // @desc    Get all offers with pagination and filtering
-// @access  Private
+// @access  Privates
 router.get('/', getOffers);
 
 // @route   GET /api/offers/:id
