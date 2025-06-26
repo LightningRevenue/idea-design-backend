@@ -47,7 +47,7 @@ exports.getCategory = async (req, res, next) => {
 // @access  Private
 exports.createCategory = async (req, res, next) => {
   try {
-    const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle } = req.body;
+    const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle, seoKeywords } = req.body;
     
     // Ensure an image was uploaded
     if (!req.file) {
@@ -70,6 +70,16 @@ exports.createCategory = async (req, res, next) => {
       }
     }
     
+    // Parse seoKeywords if it's a string (from FormData)
+    let parsedSeoKeywords = [];
+    if (seoKeywords) {
+      try {
+        parsedSeoKeywords = typeof seoKeywords === 'string' ? JSON.parse(seoKeywords) : seoKeywords;
+      } catch (error) {
+        console.error('Error parsing seoKeywords:', error);
+      }
+    }
+    
     // Create category
     const category = await Category.create({
       name,
@@ -81,7 +91,8 @@ exports.createCategory = async (req, res, next) => {
       productCount: 0,
       customSections: parsedCustomSections,
       descriptionTitle: descriptionTitle || 'Despre produsele din această categorie',
-      descriptionSubtitle: descriptionSubtitle || ''
+      descriptionSubtitle: descriptionSubtitle || '',
+      seoKeywords: parsedSeoKeywords
     });
     
     res.status(201).json({
@@ -122,6 +133,17 @@ exports.updateCategory = async (req, res, next) => {
       }
     }
     
+    // Parse seoKeywords if it's a string (from FormData)
+    let parsedSeoKeywords = category.seoKeywords || [];
+    if (req.body.seoKeywords !== undefined) {
+      try {
+        parsedSeoKeywords = typeof req.body.seoKeywords === 'string' ? 
+          JSON.parse(req.body.seoKeywords) : req.body.seoKeywords;
+      } catch (error) {
+        console.error('Error parsing seoKeywords:', error);
+      }
+    }
+    
     const updateData = {
       name: req.body.name || category.name,
       description: req.body.description || category.description,
@@ -132,7 +154,8 @@ exports.updateCategory = async (req, res, next) => {
         category.showInNavbar,
       customSections: parsedCustomSections,
       descriptionTitle: req.body.descriptionTitle !== undefined ? req.body.descriptionTitle : category.descriptionTitle,
-      descriptionSubtitle: req.body.descriptionSubtitle !== undefined ? req.body.descriptionSubtitle : category.descriptionSubtitle
+      descriptionSubtitle: req.body.descriptionSubtitle !== undefined ? req.body.descriptionSubtitle : category.descriptionSubtitle,
+      seoKeywords: parsedSeoKeywords
     };
     
     // If a new image is uploaded, update the image path

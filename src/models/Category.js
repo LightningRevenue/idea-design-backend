@@ -63,6 +63,17 @@ const categorySchema = new mongoose.Schema({
   descriptionSubtitle: {
     type: String,
     default: ''
+  },
+  // Cuvinte cheie SEO pentru afișare în footer-ul paginii de categorie
+  seoKeywords: {
+    type: [String],
+    default: [],
+    validate: {
+      validator: function(keywords) {
+        return keywords.length <= 50; // Maxim 50 de keywords
+      },
+      message: 'Prea multe cuvinte cheie. Maxim 50 permise.'
+    }
   }
 }, {
   timestamps: true

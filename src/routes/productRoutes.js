@@ -367,12 +367,20 @@ router.post('/bulk-upload', verifyAdmin, (req, res) => {
 });
 
 // @route   GET /api/products
-// @desc    Get all products
+// @desc    Get all products with pagination, filtering, and sorting
 // @access  Public
 router.get('/', async (req, res) => {
   try {
     // Check if this is an admin request (has admin authorization)
     const isAdminRequest = req.headers.authorization && req.headers.authorization.startsWith('Bearer');
+    
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+    
+    // Filtering parameters
+    const { category, search, minPrice, maxPrice, brand, sort = '-createdAt' } = req.query;
     
     let query = {};
     
@@ -381,15 +389,79 @@ router.get('/', async (req, res) => {
       query.status = 'active';
     }
     
-    // Fetch products and populate the 'category' field to get category details
-    const products = await Product.find(query).populate('category', 'name'); // Populate only name field of category
+    // Category filter
+    if (category) {
+      // Try to find category by name first, then by ID
+      const categoryObj = await Category.findOne({
+        $or: [
+          { name: { $regex: new RegExp(category, 'i') } },
+          { _id: mongoose.Types.ObjectId.isValid(category) ? category : null }
+        ]
+      });
+      if (categoryObj) {
+        query.category = categoryObj._id;
+      }
+    }
     
-    console.log('GET /api/products - Fetched products:', products.length, isAdminRequest ? '(admin)' : '(public)'); 
+    // Search filter (name and description)
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Price range filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+    
+    // Brand filter
+    if (brand) {
+      query.brand = { $regex: brand, $options: 'i' };
+    }
+    
+    // Execute query with pagination
+    const [products, totalCount] = await Promise.all([
+      Product.find(query)
+        .populate('category', 'name')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(query)
+    ]);
+    
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    console.log(`GET /api/products - Page ${page}/${totalPages}, ${products.length}/${totalCount} products`, 
+                isAdminRequest ? '(admin)' : '(public)'); 
 
     res.json({
       success: true,
-      count: products.length,
-      data: products 
+      data: products,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage: limit,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? page + 1 : null,
+        prevPage: hasPrevPage ? page - 1 : null
+      },
+      filters: {
+        category,
+        search,
+        minPrice,
+        maxPrice,
+        brand,
+        sort
+      }
     });
   } catch (err) {
     console.error('Error in GET /api/products:', err.message);
