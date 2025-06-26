@@ -403,11 +403,10 @@ router.get('/', async (req, res) => {
       }
     }
     
-    // Search filter (name and description)
+    // Search filter (only name and brand - not description)
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
         { brand: { $regex: search, $options: 'i' } }
       ];
     }
