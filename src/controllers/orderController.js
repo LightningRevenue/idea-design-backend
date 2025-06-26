@@ -38,7 +38,8 @@ exports.createOrder = async (req, res) => {
     console.log('Creare comandă pentru - userId final:', userId);
     console.log('Creare comandă pentru - guestId:', guestId);
     
-    // Verifică disponibilitatea stocului pentru fiecare produs
+    // Verifică disponibilitatea stocului și actualizează informațiile de reducere pentru fiecare produs
+    const processedOrderItems = [];
     for (const item of orderItems) {
       const product = await Product.findById(item.product);
       if (!product) {
@@ -54,18 +55,46 @@ exports.createOrder = async (req, res) => {
           message: `Nu există stoc suficient pentru ${product.name}. Disponibil: ${product.stock}` 
         });
       }
+
+      // Procesează informațiile de reducere
+      const processedItem = {
+        product: item.product,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image,
+        hasActiveDiscount: product.hasActiveDiscount || false,
+        discountedPrice: product.hasActiveDiscount ? product.discountedPrice : undefined,
+        discountPercentageDisplay: product.hasActiveDiscount ? product.discountPercentageDisplay : 0
+      };
+      
+      processedOrderItems.push(processedItem);
     }
     
-    // Creează comanda
+    // Recalculează prețurile cu reduceri aplicate
+    const calculatedItemsPrice = processedOrderItems.reduce((acc, item) => {
+      const priceToUse = item.hasActiveDiscount ? item.discountedPrice : item.price;
+      return acc + (priceToUse * item.quantity);
+    }, 0);
+    
+    const calculatedShippingPrice = calculatedItemsPrice > 200 ? 0 : 20;
+    const calculatedTotalPrice = calculatedItemsPrice + calculatedShippingPrice;
+    
+    console.log('Prețuri calculate pe backend:');
+    console.log('Items price (cu reduceri):', calculatedItemsPrice);
+    console.log('Shipping price:', calculatedShippingPrice);
+    console.log('Total price:', calculatedTotalPrice);
+    
+    // Creează comanda cu prețurile recalculate
     const order = new Order({
       user: userId || undefined,
       guestId: userId ? undefined : guestId,
-      orderItems,
+      orderItems: processedOrderItems,
       shippingAddress,
       paymentMethod,
-      itemsPrice,
-      shippingPrice,
-      totalPrice,
+      itemsPrice: calculatedItemsPrice,
+      shippingPrice: calculatedShippingPrice,
+      totalPrice: calculatedTotalPrice,
       orderNotes,
       isPaid: paymentMethod === 'card', // marcat ca plătit doar dacă metoda de plată este card
       paidAt: paymentMethod === 'card' ? Date.now() : undefined
@@ -77,7 +106,7 @@ exports.createOrder = async (req, res) => {
     console.log('Comando asociată utilizatorului:', createdOrder.user || 'Guest');
     
     // Actualizează stocul pentru fiecare produs
-    for (const item of orderItems) {
+    for (const item of processedOrderItems) {
       await Product.findByIdAndUpdate(
         item.product,
         { $inc: { stock: -item.quantity } }

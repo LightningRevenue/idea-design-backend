@@ -32,6 +32,37 @@ const categorySchema = new mongoose.Schema({
   productCount: {
     type: Number,
     default: 0
+  },
+  // Câmpuri noi pentru secțiunile custom de descriere
+  customSections: [{
+    id: {
+      type: String,
+      required: true
+    },
+    title: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    content: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    order: {
+      type: Number,
+      default: 0
+    }
+  }],
+  // Titlu custom pentru secțiunea de descriere (opțional)
+  descriptionTitle: {
+    type: String,
+    default: 'Despre produsele din această categorie'
+  },
+  // Subtitlu custom pentru secțiunea de descriere (opțional)  
+  descriptionSubtitle: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

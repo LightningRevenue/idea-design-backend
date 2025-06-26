@@ -19,6 +19,18 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  // Informații despre reducere
+  hasActiveDiscount: {
+    type: Boolean,
+    default: false
+  },
+  discountedPrice: {
+    type: Number
+  },
+  discountPercentageDisplay: {
+    type: Number,
+    default: 0
+  },
   image: {
     type: String
   }

@@ -23,6 +23,25 @@ const ProductSchema = new mongoose.Schema({
     required: [true, 'Please add a price'],
     min: [0, 'Price cannot be negative']
   },
+  // Sistem de reduceri
+  discountType: {
+    type: String,
+    enum: ['none', 'percentage', 'fixed'],
+    default: 'none'
+  },
+  discountValue: {
+    type: Number,
+    default: 0,
+    min: [0, 'Discount value cannot be negative']
+  },
+  discountStartDate: {
+    type: Date,
+    default: null
+  },
+  discountEndDate: {
+    type: Date,
+    default: null
+  },
   stock: {
     type: Number,
     required: [true, 'Please add stock quantity'],
@@ -103,6 +122,65 @@ const ProductSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Virtual pentru prețul cu reducere
+ProductSchema.virtual('discountedPrice').get(function() {
+  if (this.discountType === 'none' || this.discountValue === 0) {
+    return this.price;
+  }
+  
+  // Verifică dacă reducerea este activă (în perioada specificată)
+  const now = new Date();
+  if (this.discountStartDate && now < this.discountStartDate) {
+    return this.price; // Reducerea nu a început încă
+  }
+  if (this.discountEndDate && now > this.discountEndDate) {
+    return this.price; // Reducerea s-a terminat
+  }
+  
+  if (this.discountType === 'percentage') {
+    const discount = (this.price * this.discountValue) / 100;
+    return Math.max(0, this.price - discount);
+  } else if (this.discountType === 'fixed') {
+    return Math.max(0, this.price - this.discountValue);
+  }
+  
+  return this.price;
+});
+
+// Virtual pentru a verifica dacă produsul are reducere activă
+ProductSchema.virtual('hasActiveDiscount').get(function() {
+  if (this.discountType === 'none' || this.discountValue === 0) {
+    return false;
+  }
+  
+  const now = new Date();
+  if (this.discountStartDate && now < this.discountStartDate) {
+    return false;
+  }
+  if (this.discountEndDate && now > this.discountEndDate) {
+    return false;
+  }
+  
+  return true;
+});
+
+// Virtual pentru procentul de reducere (pentru afișare)
+ProductSchema.virtual('discountPercentageDisplay').get(function() {
+  if (!this.hasActiveDiscount) return 0;
+  
+  if (this.discountType === 'percentage') {
+    return this.discountValue;
+  } else if (this.discountType === 'fixed') {
+    return Math.round((this.discountValue / this.price) * 100);
+  }
+  
+  return 0;
+});
+
+// Asigură-te că virtualurile sunt incluse în JSON
+ProductSchema.set('toJSON', { virtuals: true });
+ProductSchema.set('toObject', { virtuals: true });
 
 // Function to create slug from text (similar to frontend)
 function createSlug(text) {

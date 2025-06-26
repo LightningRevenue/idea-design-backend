@@ -449,7 +449,7 @@ router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) =
         try {
             console.log('POST /api/products hit on backend');
             console.log('Request Body:', req.body);
-            console.log('Request Files (from multer):', req.files);            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl } = req.body;
+            console.log('Request Files (from multer):', req.files);            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, discountType, discountValue, discountStartDate, discountEndDate } = req.body;
 
             if (!name || !description || !price || !stock || !category) {
                 return res.status(400).json({ success: false, message: 'Please provide all required fields: name, description, price, stock, category' });
@@ -487,7 +487,11 @@ router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) =
                 shippingAndReturns: shippingAndReturns || '',                keyFeatures: keyFeatures ? JSON.parse(keyFeatures) : [],
                 colors: parsedColors,
                 youtubeUrl: youtubeUrl || '',
-                technicalDatasheetUrl: technicalDatasheetUrl || ''
+                technicalDatasheetUrl: technicalDatasheetUrl || '',
+                discountType: discountType || 'none',
+                discountValue: discountValue ? parseFloat(discountValue) : 0,
+                discountStartDate: discountStartDate ? new Date(discountStartDate) : null,
+                discountEndDate: discountEndDate ? new Date(discountEndDate) : null
             });
 
             const savedProduct = await newProduct.save();
@@ -538,7 +542,7 @@ router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res)
             if (!existingProduct) {
                 return res.status(404).json({ success: false, message: 'Product not found' });
             }            // Extract fields from the request body
-            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, isRecommended } = req.body;
+            const { name, brand, description, price, stock, category, status, specifications, instructions, shippingAndReturns, keyFeatures, colors, youtubeUrl, technicalDatasheetUrl, isRecommended, discountType, discountValue, discountStartDate, discountEndDate } = req.body;
 
             // Basic validation of required fields
             if (!name || !description || !price || !stock || !category) {
@@ -604,6 +608,23 @@ router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res)
 
             if (technicalDatasheetUrl !== undefined) {
                 updateData.technicalDatasheetUrl = technicalDatasheetUrl || '';
+            }
+
+            // Handle discount fields
+            if (discountType !== undefined) {
+                updateData.discountType = discountType || 'none';
+            }
+
+            if (discountValue !== undefined) {
+                updateData.discountValue = discountValue ? parseFloat(discountValue) : 0;
+            }
+
+            if (discountStartDate !== undefined) {
+                updateData.discountStartDate = discountStartDate ? new Date(discountStartDate) : null;
+            }
+
+            if (discountEndDate !== undefined) {
+                updateData.discountEndDate = discountEndDate ? new Date(discountEndDate) : null;
             }
 
             // Handle images update with better management

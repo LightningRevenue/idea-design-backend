@@ -47,7 +47,7 @@ exports.getCategory = async (req, res, next) => {
 // @access  Private
 exports.createCategory = async (req, res, next) => {
   try {
-    const { name, description, status, icon, showInNavbar } = req.body;
+    const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle } = req.body;
     
     // Ensure an image was uploaded
     if (!req.file) {
@@ -60,6 +60,16 @@ exports.createCategory = async (req, res, next) => {
     // Get image path relative to the server
     const image = `/uploads/categories/${req.file.filename}`;
     
+    // Parse customSections if it's a string (from FormData)
+    let parsedCustomSections = [];
+    if (customSections) {
+      try {
+        parsedCustomSections = typeof customSections === 'string' ? JSON.parse(customSections) : customSections;
+      } catch (error) {
+        console.error('Error parsing customSections:', error);
+      }
+    }
+    
     // Create category
     const category = await Category.create({
       name,
@@ -68,7 +78,10 @@ exports.createCategory = async (req, res, next) => {
       icon: icon || '',
       showInNavbar: showInNavbar === 'true' || showInNavbar === true,
       status: status || 'active',
-      productCount: 0
+      productCount: 0,
+      customSections: parsedCustomSections,
+      descriptionTitle: descriptionTitle || 'Despre produsele din această categorie',
+      descriptionSubtitle: descriptionSubtitle || ''
     });
     
     res.status(201).json({
@@ -98,6 +111,17 @@ exports.updateCategory = async (req, res, next) => {
       });
     }
     
+    // Parse customSections if it's a string (from FormData)
+    let parsedCustomSections = category.customSections;
+    if (req.body.customSections !== undefined) {
+      try {
+        parsedCustomSections = typeof req.body.customSections === 'string' ? 
+          JSON.parse(req.body.customSections) : req.body.customSections;
+      } catch (error) {
+        console.error('Error parsing customSections:', error);
+      }
+    }
+    
     const updateData = {
       name: req.body.name || category.name,
       description: req.body.description || category.description,
@@ -105,7 +129,10 @@ exports.updateCategory = async (req, res, next) => {
       icon: req.body.icon !== undefined ? req.body.icon : category.icon,
       showInNavbar: req.body.showInNavbar !== undefined ? 
         (req.body.showInNavbar === 'true' || req.body.showInNavbar === true) : 
-        category.showInNavbar
+        category.showInNavbar,
+      customSections: parsedCustomSections,
+      descriptionTitle: req.body.descriptionTitle !== undefined ? req.body.descriptionTitle : category.descriptionTitle,
+      descriptionSubtitle: req.body.descriptionSubtitle !== undefined ? req.body.descriptionSubtitle : category.descriptionSubtitle
     };
     
     // If a new image is uploaded, update the image path
