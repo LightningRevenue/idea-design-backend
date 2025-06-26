@@ -438,7 +438,23 @@ router.get('/', async (req, res) => {
     const hasPrevPage = page > 1;
     
     console.log(`GET /api/products - Page ${page}/${totalPages}, ${products.length}/${totalCount} products`, 
-                isAdminRequest ? '(admin)' : '(public)'); 
+                isAdminRequest ? '(admin)' : '(public)');
+    
+    // Debug: Log discount info for products with discounts
+    products.forEach(product => {
+      if (product.discountType !== 'none') {
+        console.log(`Product "${product.name}" discount debug:`, {
+          discountType: product.discountType,
+          discountValue: product.discountValue,
+          discountStartDate: product.discountStartDate,
+          discountEndDate: product.discountEndDate,
+          hasActiveDiscount: product.hasActiveDiscount,
+          discountedPrice: product.discountedPrice,
+          originalPrice: product.price,
+          currentTime: new Date()
+        });
+      }
+    });
 
     res.json({
       success: true,
@@ -500,6 +516,21 @@ router.get('/:identifier', async (req, res) => {
         }
 
         console.log(`Product found: ${product.name} (slug: ${product.slug})`);
+        
+        // Debug discount info if product has discounts
+        if (product.discountType !== 'none') {
+          console.log(`Single product "${product.name}" discount debug:`, {
+            discountType: product.discountType,
+            discountValue: product.discountValue,
+            discountStartDate: product.discountStartDate,
+            discountEndDate: product.discountEndDate,
+            hasActiveDiscount: product.hasActiveDiscount,
+            discountedPrice: product.discountedPrice,
+            originalPrice: product.price,
+            currentTime: new Date()
+          });
+        }
+        
         res.json({ success: true, data: product });
 
     } catch (err) {
@@ -742,12 +773,29 @@ router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res)
             }
 
             console.log('Updating product with data:', updateData);
+            console.log('Discount data being saved:', {
+                discountType: updateData.discountType,
+                discountValue: updateData.discountValue,
+                discountStartDate: updateData.discountStartDate,
+                discountEndDate: updateData.discountEndDate
+            });
+            
             // Update the product in the database
             const updatedProduct = await Product.findByIdAndUpdate(
                 productId, 
                 updateData,
                 { new: true, runValidators: true } // Returns the updated document and runs validators
             ).populate('category', 'name');
+            
+            console.log('Product after update - discount fields:', {
+                discountType: updatedProduct.discountType,
+                discountValue: updatedProduct.discountValue,
+                discountStartDate: updatedProduct.discountStartDate,
+                discountEndDate: updatedProduct.discountEndDate,
+                hasActiveDiscount: updatedProduct.hasActiveDiscount,
+                discountedPrice: updatedProduct.discountedPrice,
+                currentTime: new Date()
+            });
 
             res.json({
                 success: true,

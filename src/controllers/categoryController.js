@@ -47,7 +47,7 @@ exports.getCategory = async (req, res, next) => {
 // @access  Private
 exports.createCategory = async (req, res, next) => {
   try {
-    const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle, seoKeywords } = req.body;
+    const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle, seoKeywords, seoText, seoTextTitle } = req.body;
     
     // Ensure an image was uploaded
     if (!req.file) {
@@ -92,7 +92,9 @@ exports.createCategory = async (req, res, next) => {
       customSections: parsedCustomSections,
       descriptionTitle: descriptionTitle || 'Despre produsele din această categorie',
       descriptionSubtitle: descriptionSubtitle || '',
-      seoKeywords: parsedSeoKeywords
+      seoKeywords: parsedSeoKeywords,
+      seoText: seoText || '',
+      seoTextTitle: seoTextTitle || 'Despre produsele din această categorie'
     });
     
     res.status(201).json({
@@ -155,7 +157,9 @@ exports.updateCategory = async (req, res, next) => {
       customSections: parsedCustomSections,
       descriptionTitle: req.body.descriptionTitle !== undefined ? req.body.descriptionTitle : category.descriptionTitle,
       descriptionSubtitle: req.body.descriptionSubtitle !== undefined ? req.body.descriptionSubtitle : category.descriptionSubtitle,
-      seoKeywords: parsedSeoKeywords
+      seoKeywords: parsedSeoKeywords,
+      seoText: req.body.seoText !== undefined ? req.body.seoText : category.seoText,
+      seoTextTitle: req.body.seoTextTitle !== undefined ? req.body.seoTextTitle : category.seoTextTitle
     };
     
     // If a new image is uploaded, update the image path

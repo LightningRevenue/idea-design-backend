@@ -18,6 +18,7 @@ const architectPartnershipRoutes = require('./src/routes/architectPartnershipRou
 const bulkImportRoutes = require('./src/routes/bulkImportRoutes'); // Import bulk import routes
 const inspirationRoutes = require('./src/routes/inspirationRoutes'); // Import inspiration routes
 const offerRoutes = require('./src/routes/offerRoutes'); // Import offer routes
+const analyticsRoutes = require('./src/routes/analyticsRoutes'); // Import analytics routes
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +74,7 @@ app.use('/api/architect-partnerships', architectPartnershipRoutes); // Add archi
 app.use('/api/bulk-import', bulkImportRoutes); // Add bulk import routes
 app.use('/api/inspiration', inspirationRoutes); // Add inspiration routes
 app.use('/api/offers', offerRoutes); // Add offer routes
+app.use('/api/analytics', analyticsRoutes); // Add analytics routes
 
 // Base route
 app.get('/', (req, res) => {

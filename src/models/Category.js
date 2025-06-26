@@ -74,6 +74,18 @@ const categorySchema = new mongoose.Schema({
       },
       message: 'Prea multe cuvinte cheie. Maxim 50 permise.'
     }
+  },
+  // Text SEO expandabil pentru pagina de categorie
+  seoText: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  // Titlul pentru secțiunea SEO (opțional)
+  seoTextTitle: {
+    type: String,
+    default: 'Despre produsele din această categorie',
+    trim: true
   }
 }, {
   timestamps: true
