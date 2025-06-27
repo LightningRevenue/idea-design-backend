@@ -19,8 +19,10 @@ router.use(verifyAdmin); // All routes below require admin authentication
 
 router.get('/', getAllBrands);
 router.get('/:id', getBrandById);
-router.post('/', upload.single('logo'), createBrand);
-router.put('/:id', upload.single('logo'), updateBrand);
+const { uploadAndProcessBrandLogo } = require('../middleware/s3Upload');
+
+router.post('/', uploadAndProcessBrandLogo, createBrand);
+router.put('/:id', uploadAndProcessBrandLogo, updateBrand);
 router.delete('/:id', deleteBrand);
 
 module.exports = router; 

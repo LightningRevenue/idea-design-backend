@@ -149,8 +149,8 @@ const createBrand = async (req, res) => {
     };
 
     // Add logo if uploaded
-    if (req.file) {
-      brandData.logo = req.file.path;
+    if (req.uploadedUrl) {
+      brandData.logo = req.uploadedUrl;
     }
 
     const brand = new Brand(brandData);
@@ -206,12 +206,9 @@ const updateBrand = async (req, res) => {
     if (isActive !== undefined) brand.isActive = isActive;
 
     // Update logo if new one uploaded
-    if (req.file) {
-      // Delete old logo if exists
-      if (brand.logo && fs.existsSync(brand.logo)) {
-        fs.unlinkSync(brand.logo);
-      }
-      brand.logo = req.file.path;
+    if (req.uploadedUrl) {
+      // Note: For S3, we don't delete old images automatically
+      brand.logo = req.uploadedUrl;
     }
 
     await brand.save();

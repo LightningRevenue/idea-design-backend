@@ -50,15 +50,15 @@ exports.createCategory = async (req, res, next) => {
     const { name, description, status, icon, showInNavbar, customSections, descriptionTitle, descriptionSubtitle, seoKeywords, seoText, seoTextTitle } = req.body;
     
     // Ensure an image was uploaded
-    if (!req.file) {
+    if (!req.uploadedUrl) {
       return res.status(400).json({
         success: false,
         message: 'Vă rugăm să încărcați o imagine pentru categorie'
       });
     }
     
-    // Get image path relative to the server
-    const image = `/uploads/categories/${req.file.filename}`;
+    // Get image URL from S3
+    const image = req.uploadedUrl;
     
     // Parse customSections if it's a string (from FormData)
     let parsedCustomSections = [];
@@ -102,10 +102,8 @@ exports.createCategory = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Delete uploaded image if category creation fails
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
+    // Note: For S3, we don't need to clean up files on error as they're already uploaded
+    // In a production environment, you might want to implement S3 cleanup here
     next(error);
   }
 };
@@ -162,15 +160,11 @@ exports.updateCategory = async (req, res, next) => {
       seoTextTitle: req.body.seoTextTitle !== undefined ? req.body.seoTextTitle : category.seoTextTitle
     };
     
-    // If a new image is uploaded, update the image path
-    if (req.file) {
-      // Delete old image if it exists
-      const oldImagePath = path.join(__dirname, '../..', category.image);
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
-      }
-      
-      updateData.image = `/uploads/categories/${req.file.filename}`;
+    // If a new image is uploaded, update the image URL
+    if (req.uploadedUrl) {
+      // Note: For S3, we don't delete old images automatically
+      // You might want to implement S3 cleanup logic here
+      updateData.image = req.uploadedUrl;
     }
     
     // Update category
@@ -184,10 +178,7 @@ exports.updateCategory = async (req, res, next) => {
       data: category
     });
   } catch (error) {
-    // Delete uploaded image if category update fails
-    if (req.file) {
-      fs.unlinkSync(req.file.path);
-    }
+    // Note: For S3, we don't need to clean up files on error as they're already uploaded
     next(error);
   }
 };

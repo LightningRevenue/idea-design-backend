@@ -7,7 +7,7 @@ const fs = require('fs');
 const mongoose = require('mongoose'); // Make sure this is at the top with other requires
 const { verifyAdmin } = require('../middleware/adminAuth');
 const upload = require('../middleware/upload'); // This is for categories, will be unused for product image uploads now
-const { uploadAndCompressProductImages } = require('../middleware/productImageUpload'); // Import dedicated product upload middleware
+const { uploadAndProcessProductImages } = require('../middleware/s3Upload'); // Import S3 upload middleware
 const multer = require('multer'); // Import multer
 const xlsx = require('xlsx');
 const { v4: uuidv4 } = require('uuid'); // For unique filenames
@@ -547,7 +547,7 @@ router.get('/:identifier', async (req, res) => {
 // @route   POST /api/products
 // @desc    Create a new product
 // @access  Private (admin only)
-router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) => {
+router.post('/', verifyAdmin, uploadAndProcessProductImages, async (req, res) => {
         try {
             console.log('POST /api/products hit on backend');
             console.log('Request Body:', req.body);
@@ -559,8 +559,8 @@ router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) =
 
             // Handle images array
             let images = [];
-            if (req.files && req.files.length > 0) {
-                images = req.files.map(file => `uploads/product_images/${file.filename}`.replace(/\\/g, '/'));
+            if (req.uploadedUrls && req.uploadedUrls.length > 0) {
+                images = req.uploadedUrls;
             } else {
                 images = ['uploads/default/no-photo.jpg'];
             }
@@ -626,7 +626,7 @@ router.post('/', verifyAdmin, uploadAndCompressProductImages, async (req, res) =
 // @route   PUT /api/products/:id
 // @desc    Update a product by id
 // @access  Private (admin only)
-router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res) => {
+router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) => {
         console.log('PUT /api/products/:id route hit with ID:', req.params.id);
         console.log('Request Body:', req.body);
         console.log('Request Files (from multer):', req.files);
@@ -748,13 +748,12 @@ router.put('/:id', verifyAdmin, uploadAndCompressProductImages, async (req, res)
             }
 
             // Add new images if uploaded
-            if (req.files && req.files.length > 0) {
-                const newImagePaths = req.files.map(file => `uploads/product_images/${file.filename}`.replace(/\\/g, '/'));
-                finalImages = [...finalImages, ...newImagePaths];
+            if (req.uploadedUrls && req.uploadedUrls.length > 0) {
+                finalImages = [...finalImages, ...req.uploadedUrls];
             }
 
             // Update images in database
-            if (currentImages || (req.files && req.files.length > 0)) {
+            if (currentImages || (req.uploadedUrls && req.uploadedUrls.length > 0)) {
                 updateData.images = finalImages;
                 
                 // Clean up orphaned images (images that were in existingProduct but not in finalImages)

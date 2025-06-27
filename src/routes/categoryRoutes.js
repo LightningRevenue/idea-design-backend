@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const upload = require('../middleware/upload');
+const { uploadAndProcessCategoryImage } = require('../middleware/s3Upload');
 const {
   getCategories,
   getCategory,
@@ -35,12 +35,12 @@ const uploadAndCompress = (req, res, next) => {
 // Get all categories & Create a new category
 router.route('/')
   .get(getCategories)
-  .post(verifyAdmin, upload.single('image'), createCategory);
+  .post(verifyAdmin, uploadAndProcessCategoryImage, createCategory);
 
 // Get, update and delete a single category
 router.route('/:id')
   .get(getCategory)
-  .put(verifyAdmin, upload.single('image'), updateCategory)
+  .put(verifyAdmin, uploadAndProcessCategoryImage, updateCategory)
   .delete(verifyAdmin, deleteCategory);
 
 // Update product count for a category
