@@ -84,14 +84,19 @@ app.get('/', (req, res) => {
   res.send('API is running');
 });
 
-// Catch-all route pentru ORICE pagină care nu este API
-app.get('*', (req, res, next) => {
+// Catch-all middleware pentru ORICE pagină care nu este API
+app.use((req, res, next) => {
   // Skip rutele API și fișierele statice
   if (req.originalUrl.startsWith('/api/') || 
       req.originalUrl.startsWith('/uploads/') ||
       req.originalUrl === '/favicon.ico' ||
       req.originalUrl === '/robots.txt' ||
       req.originalUrl === '/sitemap.xml') {
+    return next();
+  }
+  
+  // Doar pentru GET requests
+  if (req.method !== 'GET') {
     return next();
   }
   
