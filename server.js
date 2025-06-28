@@ -19,6 +19,7 @@ const bulkImportRoutes = require('./src/routes/bulkImportRoutes'); // Import bul
 const inspirationRoutes = require('./src/routes/inspirationRoutes'); // Import inspiration routes
 const offerRoutes = require('./src/routes/offerRoutes'); // Import offer routes
 const analyticsRoutes = require('./src/routes/analyticsRoutes'); // Import analytics routes
+const { rendertronMiddleware } = require('./src/middleware/rendertronMiddleware'); // Import Rendertron middleware
 
 // Load environment variables
 dotenv.config();
@@ -45,6 +46,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Toate rutele sunt acum gestionate de catch-all route-ul de mai jos
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -79,6 +82,24 @@ app.use('/api/analytics', analyticsRoutes); // Add analytics routes
 // Base route
 app.get('/', (req, res) => {
   res.send('API is running');
+});
+
+// Catch-all route pentru ORICE pagină care nu este API
+app.get('*', (req, res, next) => {
+  // Skip rutele API și fișierele statice
+  if (req.originalUrl.startsWith('/api/') || 
+      req.originalUrl.startsWith('/uploads/') ||
+      req.originalUrl === '/favicon.ico' ||
+      req.originalUrl === '/robots.txt' ||
+      req.originalUrl === '/sitemap.xml') {
+    return next();
+  }
+  
+  // Aplică middleware-ul Rendertron pentru toate celelalte rute
+  rendertronMiddleware(req, res, () => {
+    // Dacă nu este crawler, redirecționează către frontend
+    res.redirect(`https://www.idea-design.ro${req.originalUrl}`);
+  });
 });
 
 // Error handler middleware

@@ -729,15 +729,42 @@ router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) 
                 updateData.discountEndDate = discountEndDate ? new Date(discountEndDate) : null;
             }
 
-            // Handle images update with better management
-            const { currentImages } = req.body;
+            // Enhanced images management with robust operations support
+            const { currentImages, imagesToDelete, hasImageOperations } = req.body;
             let finalImages = [];
+            let operationsApplied = [];
 
-            // If currentImages is provided, it means frontend is managing image order and deletions
+            // Parse operation flags if provided
+            let imageOpsInfo = { hasNewImages: false, hasDeletedImages: false, hasReorderedImages: false, totalOperations: 0 };
+            if (hasImageOperations) {
+                try {
+                    imageOpsInfo = JSON.parse(hasImageOperations);
+                } catch (e) {
+                    console.error('Error parsing hasImageOperations:', e);
+                }
+            }
+
+            console.log('Image operations info:', imageOpsInfo);
+
+            // Handle explicit image deletions first
+            let imagesToDeleteArray = [];
+            if (imagesToDelete) {
+                try {
+                    imagesToDeleteArray = JSON.parse(imagesToDelete);
+                    console.log('Images to delete:', imagesToDeleteArray);
+                } catch (e) {
+                    console.error('Error parsing imagesToDelete:', e);
+                }
+            }
+
+            // Start with current images (after deletions and reordering)
             if (currentImages) {
                 try {
                     const parsedCurrentImages = JSON.parse(currentImages);
                     finalImages = [...parsedCurrentImages];
+                    if (imageOpsInfo.hasReorderedImages) {
+                        operationsApplied.push('Reordered existing images');
+                    }
                 } catch (e) {
                     console.error('Error parsing currentImages:', e);
                     finalImages = [...existingProduct.images];
@@ -750,16 +777,44 @@ router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) 
             // Add new images if uploaded
             if (req.uploadedUrls && req.uploadedUrls.length > 0) {
                 finalImages = [...finalImages, ...req.uploadedUrls];
+                operationsApplied.push(`Added ${req.uploadedUrls.length} new images`);
             }
 
-            // Update images in database
-            if (currentImages || (req.uploadedUrls && req.uploadedUrls.length > 0)) {
-                updateData.images = finalImages;
-                
-                // Clean up orphaned images (images that were in existingProduct but not in finalImages)
-                if (Array.isArray(existingProduct.images)) {
-                    existingProduct.images.forEach(imgPath => {
-                        if (imgPath && !imgPath.includes('no-photo.jpg') && !finalImages.includes(imgPath)) {
+            // Handle image deletions and cleanup
+            if (imagesToDeleteArray.length > 0) {
+                // Delete files from storage (S3 or local)
+                imagesToDeleteArray.forEach(imgPath => {
+                    if (imgPath && !imgPath.includes('no-photo.jpg')) {
+                        // Check if it's an S3 URL or local path
+                        if (imgPath.startsWith('http')) {
+                            // S3 image - could implement S3 deletion here if needed
+                            console.log('S3 image marked for deletion (not implemented):', imgPath);
+                        } else {
+                            // Local image
+                            const oldImagePath = path.join(__dirname, '../../', imgPath);
+                            fs.unlink(oldImagePath, (unlinkErr) => {
+                                if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+                                    console.error("Error deleting specified product image:", unlinkErr);
+                                }
+                            });
+                        }
+                    }
+                });
+                operationsApplied.push(`Deleted ${imagesToDeleteArray.length} images`);
+            }
+
+            // Clean up any remaining orphaned images (safety net)
+            if (Array.isArray(existingProduct.images)) {
+                existingProduct.images.forEach(imgPath => {
+                    if (imgPath && 
+                        !imgPath.includes('no-photo.jpg') && 
+                        !finalImages.includes(imgPath) && 
+                        !imagesToDeleteArray.includes(imgPath)) {
+                        
+                        // This is an orphaned image
+                        if (imgPath.startsWith('http')) {
+                            console.log('Orphaned S3 image detected (cleanup not implemented):', imgPath);
+                        } else {
                             const oldImagePath = path.join(__dirname, '../../', imgPath);
                             fs.unlink(oldImagePath, (unlinkErr) => {
                                 if (unlinkErr && unlinkErr.code !== 'ENOENT') {
@@ -767,8 +822,16 @@ router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) 
                                 }
                             });
                         }
-                    });
-                }
+                        operationsApplied.push('Cleaned up orphaned images');
+                    }
+                });
+            }
+
+            // Update images in database if any operations were performed
+            if (currentImages || imagesToDeleteArray.length > 0 || (req.uploadedUrls && req.uploadedUrls.length > 0)) {
+                updateData.images = finalImages;
+                console.log('Final images array:', finalImages);
+                console.log('Operations applied:', operationsApplied);
             }
 
             console.log('Updating product with data:', updateData);
@@ -796,10 +859,20 @@ router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) 
                 currentTime: new Date()
             });
 
+            // Enhanced response with operation details
+            const responseMessage = operationsApplied.length > 0 
+                ? `Product updated successfully. Operations: ${operationsApplied.join(', ')}`
+                : 'Product updated successfully';
+
             res.json({
                 success: true,
-                message: 'Product updated successfully',
-                data: updatedProduct
+                message: responseMessage,
+                data: updatedProduct,
+                imageOperations: {
+                    applied: operationsApplied,
+                    totalOperations: imageOpsInfo.totalOperations,
+                    finalImageCount: finalImages.length
+                }
             });
 
         } catch (err) {
