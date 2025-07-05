@@ -1,0 +1,65 @@
+const mongoose = require('mongoose');
+
+const homepageCategorySchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, 'Titlul este obligatoriu'],
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  image: {
+    type: String,
+    required: [true, 'Imaginea este obligatorie']
+  },
+  products: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  }],
+  displayOrder: {
+    type: Number,
+    default: 0
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  style: {
+    layout: {
+      type: String,
+      enum: ['grid', 'carousel', 'featured'],
+      default: 'grid'
+    },
+    backgroundColor: {
+      type: String,
+      default: '#ffffff'
+    },
+    textColor: {
+      type: String,
+      default: '#000000'
+    }
+  }
+}, {
+  timestamps: true
+});
+
+// Create slug from title before saving
+homepageCategorySchema.pre('save', function(next) {
+  if (!this.isModified('title')) {
+    next();
+    return;
+  }
+  
+  this.slug = this.title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  
+  next();
+});
+
+module.exports = mongoose.model('HomepageCategory', homepageCategorySchema); 

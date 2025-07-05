@@ -42,6 +42,29 @@ exports.getCategory = async (req, res, next) => {
   }
 };
 
+// @desc    Get single category by slug
+// @route   GET /api/categories/slug/:slug
+// @access  Public
+exports.getCategoryBySlug = async (req, res, next) => {
+    try {
+        const category = await Category.findOne({ slug: req.params.slug });
+
+        if (!category) {
+            return res.status(404).json({
+                success: false,
+                message: 'Categoria nu a fost găsită'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: category
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Create new category
 // @route   POST /api/categories
 // @access  Private

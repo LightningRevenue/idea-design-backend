@@ -20,6 +20,7 @@ const inspirationRoutes = require('./src/routes/inspirationRoutes'); // Import i
 const offerRoutes = require('./src/routes/offerRoutes'); // Import offer routes
 const analyticsRoutes = require('./src/routes/analyticsRoutes'); // Import analytics routes
 const { rendertronMiddleware } = require('./src/middleware/rendertronMiddleware'); // Import Rendertron middleware
+const homepageCategoryRoutes = require('./src/routes/homepageCategoryRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -78,6 +79,7 @@ app.use('/api/bulk-import', bulkImportRoutes); // Add bulk import routes
 app.use('/api/inspiration', inspirationRoutes); // Add inspiration routes
 app.use('/api/offers', offerRoutes); // Add offer routes
 app.use('/api/analytics', analyticsRoutes); // Add analytics routes
+app.use('/api/homepage-categories', homepageCategoryRoutes);
 
 // Base route
 app.get('/', (req, res) => {

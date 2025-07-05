@@ -6,6 +6,7 @@ const fs = require('fs');
 const { verifyAdmin } = require('../middleware/adminAuth');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
 
 const { uploadAndProcessInspirationImage } = require('../middleware/s3Upload');
 
@@ -69,12 +70,22 @@ router.get('/admin/all', verifyAdmin, async (req, res) => {
   }
 });
 
-// @route   GET /api/inspiration/:id
-// @desc    Get single inspiration item by ID
+// @route   GET /api/inspiration/:idOrSlug
+// @desc    Get single inspiration item by ID or slug
 // @access  Public
-router.get('/:id', async (req, res) => {
+router.get('/:idOrSlug', async (req, res) => {
   try {
-    const inspirationItem = await Inspiration.findById(req.params.id);
+    let inspirationItem;
+    
+    // First try to find by ID (for admin panel)
+    if (mongoose.Types.ObjectId.isValid(req.params.idOrSlug)) {
+      inspirationItem = await Inspiration.findById(req.params.idOrSlug);
+    }
+    
+    // If not found by ID, try to find by slug (for frontend)
+    if (!inspirationItem) {
+      inspirationItem = await Inspiration.findOne({ slug: req.params.idOrSlug });
+    }
     
     if (!inspirationItem) {
       return res.status(404).json({ success: false, message: 'Inspiration item not found' });
@@ -89,7 +100,7 @@ router.get('/:id', async (req, res) => {
       data: inspirationItem
     });
   } catch (err) {
-    console.error('Error in GET /api/inspiration/:id:', err.message);
+    console.error('Error in GET /api/inspiration/:idOrSlug:', err.message);
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
@@ -97,9 +108,19 @@ router.get('/:id', async (req, res) => {
 // @route   POST /api/inspiration
 // @desc    Create new inspiration item
 // @access  Private (admin only)
-router.post('/', verifyAdmin, uploadAndProcessInspirationImage, async (req, res) => {
+router.post('/', verifyAdmin, async (req, res) => {
   try {
-    const { title, description, tags, category, status, featured } = req.body;
+    const { 
+      title, 
+      description, 
+      tags, 
+      category, 
+      status, 
+      featured,
+      mainImage,
+      images,
+      projectDetails 
+    } = req.body;
     
     // Parse tags if it's a string
     let parsedTags = [];
@@ -114,16 +135,19 @@ router.post('/', verifyAdmin, uploadAndProcessInspirationImage, async (req, res)
     const inspirationData = {
       title,
       description: description || '',
+      mainImage,
+      images: images || [],
+      projectDetails: {
+        location: projectDetails?.location || '',
+        area: Number(projectDetails?.area) || 0,
+        completionYear: Number(projectDetails?.completionYear) || null,
+        style: projectDetails?.style || ''
+      },
       tags: parsedTags,
       category: category || 'alte',
       status: status || 'draft',
       featured: featured === 'true' || featured === true
     };
-    
-    // Handle image upload from S3
-    if (req.uploadedUrl) {
-      inspirationData.image = req.uploadedUrl;
-    }
     
     const inspirationItem = await Inspiration.create(inspirationData);
     
@@ -149,7 +173,7 @@ router.put('/:id', verifyAdmin, uploadAndProcessInspirationImage, async (req, re
       return res.status(404).json({ success: false, message: 'Inspiration item not found' });
     }
     
-    const { title, description, tags, category, status, featured } = req.body;
+    const { title, description, tags, category, status, featured, projectDetails, mainImage, images } = req.body;
     
     // Parse tags if it's a string
     let parsedTags = [];
@@ -167,13 +191,28 @@ router.put('/:id', verifyAdmin, uploadAndProcessInspirationImage, async (req, re
       tags: parsedTags.length > 0 ? parsedTags : inspirationItem.tags,
       category: category || inspirationItem.category,
       status: status || inspirationItem.status,
-      featured: featured !== undefined ? (featured === 'true' || featured === true) : inspirationItem.featured
+      featured: featured !== undefined ? (featured === 'true' || featured === true) : inspirationItem.featured,
+      projectDetails: {
+        location: projectDetails?.location || inspirationItem.projectDetails?.location || '',
+        area: projectDetails?.area !== undefined ? Number(projectDetails.area) : inspirationItem.projectDetails?.area || 0,
+        completionYear: projectDetails?.completionYear !== undefined ? Number(projectDetails.completionYear) : inspirationItem.projectDetails?.completionYear || null,
+        style: projectDetails?.style || inspirationItem.projectDetails?.style || ''
+      }
     };
+
+    // Update mainImage if provided
+    if (mainImage) {
+      updateData.mainImage = mainImage;
+    }
+
+    // Update images array if provided
+    if (images) {
+      updateData.images = images;
+    }
     
     // Handle image upload from S3
     if (req.uploadedUrl) {
-      // Note: For S3, we don't delete old images automatically
-      updateData.image = req.uploadedUrl;
+      updateData.mainImage = req.uploadedUrl;
     }
     
     const updatedInspirationItem = await Inspiration.findByIdAndUpdate(
@@ -221,6 +260,32 @@ router.delete('/:id', verifyAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error deleting inspiration item:', err.message);
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// @route   POST /api/inspiration/upload
+// @desc    Upload inspiration image(s)
+// @access  Private (admin only)
+router.post('/upload', verifyAdmin, uploadAndProcessInspirationImage, async (req, res) => {
+  try {
+    if (!req.uploadedUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'No image was uploaded'
+      });
+    }
+
+    res.json({
+      success: true,
+      url: req.uploadedUrl,
+      message: 'Image uploaded successfully'
+    });
+  } catch (err) {
+    console.error('Error uploading image:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading image'
+    });
   }
 });
 

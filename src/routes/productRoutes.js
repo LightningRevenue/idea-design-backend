@@ -407,7 +407,8 @@ router.get('/', async (req, res) => {
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } }
+        { brand: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
       ];
     }
     
@@ -577,7 +578,7 @@ router.post('/', verifyAdmin, uploadAndProcessProductImages, async (req, res) =>
 
             const newProduct = new Product({
                 name,
-                brand: brand || '',
+                brand: brand || undefined,
                 description,
                 price: parseFloat(price),
                 stock: parseInt(stock, 10),
@@ -654,7 +655,7 @@ router.put('/:id', verifyAdmin, uploadAndProcessProductImages, async (req, res) 
             // Build the update object for the product
             const updateData = {
                 name,
-                brand: brand || '',
+                brand, // Always update brand, even if it's an empty string
                 description,
                 price: parseFloat(price),
                 stock: parseInt(stock, 10),
@@ -1069,6 +1070,7 @@ router.patch('/bulk-edit', verifyAdmin, async (req, res) => {
             updateData.category = updates.category;
         }
 
+        // Always update brand if it's defined, even if it's an empty string
         if (updates.brand !== undefined) {
             updateData.brand = updates.brand;
         }

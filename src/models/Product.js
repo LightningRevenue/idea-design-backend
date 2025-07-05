@@ -11,7 +11,8 @@ const ProductSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: [50, 'Brand name can not be more than 50 characters'],
-    default: ''
+    default: null,
+    set: v => v === '' ? null : v // Convert empty strings to null
   },
   description: {
     type: String,
@@ -125,27 +126,29 @@ const ProductSchema = new mongoose.Schema({
 
 // Virtual pentru prețul cu reducere
 ProductSchema.virtual('discountedPrice').get(function() {
-  if (this.discountType === 'none' || this.discountValue === 0) {
-    return this.price;
+  if (this.discountType === 'none' || this.discountValue <= 0) {
+    return null;
   }
   
   // Verifică dacă reducerea este activă (în perioada specificată)
   const now = new Date();
   if (this.discountStartDate && now < this.discountStartDate) {
-    return this.price; // Reducerea nu a început încă
+    return null; // Reducerea nu a început încă
   }
   if (this.discountEndDate && now > this.discountEndDate) {
-    return this.price; // Reducerea s-a terminat
+    return null; // Reducerea s-a terminat
   }
   
   if (this.discountType === 'percentage') {
     const discount = (this.price * this.discountValue) / 100;
-    return Math.max(0, this.price - discount);
+    const finalPrice = this.price - discount;
+    return finalPrice < this.price ? Math.max(0, finalPrice) : null;
   } else if (this.discountType === 'fixed') {
-    return Math.max(0, this.price - this.discountValue);
+    const finalPrice = this.price - this.discountValue;
+    return finalPrice < this.price ? Math.max(0, finalPrice) : null;
   }
   
-  return this.price;
+  return null;
 });
 
 // Virtual pentru a verifica dacă produsul are reducere activă
