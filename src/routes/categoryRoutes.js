@@ -7,7 +7,8 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-  updateProductCount
+  updateProductCount,
+  getCategoryBySlug
 } = require('../controllers/categoryController');
 const { verifyAdmin } = require('../middleware/adminAuth');
 
@@ -36,6 +37,9 @@ const uploadAndCompress = (req, res, next) => {
 router.route('/')
   .get(getCategories)
   .post(verifyAdmin, uploadAndProcessCategoryImage, createCategory);
+
+// Get category by slug
+router.get('/slug/:slug', getCategoryBySlug);
 
 // Get, update and delete a single category
 router.route('/:id')

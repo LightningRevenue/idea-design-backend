@@ -6,6 +6,10 @@ const homepageCategorySchema = new mongoose.Schema({
     required: [true, 'Titlul este obligatoriu'],
     trim: true
   },
+  slug: {
+    type: String,
+    unique: true
+  },
   description: {
     type: String,
     trim: true
@@ -52,18 +56,14 @@ const homepageCategorySchema = new mongoose.Schema({
 
 // Create slug from title before saving
 homepageCategorySchema.pre('save', function(next) {
-  if (!this.isModified('title')) {
-    next();
-    return;
+  if (this.isModified('title')) {
+    this.slug = this.title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
-  
-  this.slug = this.title
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  
   next();
 });
 

@@ -74,20 +74,9 @@ router.get('/admin/available-products', verifyAdmin, async (req, res) => {
 router.get('/slug/:slug', async (req, res) => {
     try {
         const slug = req.params.slug;
-        console.log('Fetching category with slug:', slug);
         
-        // Create a regex pattern that matches the slug ignoring case
-        const slugRegex = new RegExp(`^${slug}$`, 'i');
-        
-        // Find the category where the slug of the title matches
-        const category = await HomepageCategory.findOne({
-            $expr: {
-                $regexMatch: {
-                    input: { $toLower: { $trim: { input: { $replaceAll: { input: "$title", find: " ", replacement: "-" } } } } },
-                    regex: slugRegex
-                }
-            }
-        }).populate({
+        // Căutăm secțiunea de pe homepage al cărei titlu, convertit în slug, se potrivește cu slug-ul din URL
+        const sections = await HomepageCategory.find().populate({
             path: 'products',
             select: '_id name price images category slug description discountType discountValue discountStartDate discountEndDate',
             populate: {
@@ -96,19 +85,19 @@ router.get('/slug/:slug', async (req, res) => {
             }
         });
 
-        // Log the populated category data to the console for debugging
-        console.log('Populated category data from backend:', JSON.stringify(category, null, 2));
+        const createSlug = (title) => title.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 
-        if (!category) {
-            console.log('Category not found for slug:', slug);
+        const section = sections.find(s => createSlug(s.title) === slug);
+
+        if (!section) {
             return res.status(404).json({ 
                 success: false, 
                 message: 'Secțiunea nu a fost găsită' 
             });
         }
 
-        // Calculate discounted prices for products
-        const categoryData = category.toObject();
+        // Se continuă cu logica de calculare a prețurilor cu discount
+        const categoryData = section.toObject();
         categoryData.products = categoryData.products.map(product => {
             const now = new Date();
             let discountedPrice = null;
