@@ -214,6 +214,7 @@ router.post('/', verifyAdmin, uploadAndProcessCategoryImage, async (req, res) =>
       image: req.uploadedUrl || req.body.image,
       displayOrder: parseInt(req.body.displayOrder) || 0,
       isActive: req.body.isActive === 'true',
+      displaySection: req.body.displaySection || 'section1',
       style: {
         layout: req.body.style?.layout || 'grid',
         backgroundColor: req.body.style?.backgroundColor || '#ffffff',
@@ -249,20 +250,16 @@ router.put('/:id', verifyAdmin, uploadAndProcessCategoryImage, async (req, res) 
   try {
     console.log('Updating category ID:', req.params.id);
     console.log('Update body:', req.body);
-    
-    // Get products array from body
+
     const products = req.body.products || [];
-    console.log('Products from body:', products);
-    
     const productIds = Array.isArray(products) ? products : [products];
-    console.log('Processed product IDs:', productIds);
 
     const updateData = {
       title: req.body.title,
       description: req.body.description,
-      ...(req.uploadedUrl && { image: req.uploadedUrl }),
       displayOrder: parseInt(req.body.displayOrder) || 0,
       isActive: req.body.isActive === 'true',
+      displaySection: req.body.displaySection || 'section1',
       style: {
         layout: req.body.style?.layout || 'grid',
         backgroundColor: req.body.style?.backgroundColor || '#ffffff',
@@ -271,31 +268,27 @@ router.put('/:id', verifyAdmin, uploadAndProcessCategoryImage, async (req, res) 
       products: productIds
     };
 
-    // If no new image was uploaded, keep the existing one
-    if (!req.uploadedUrl && req.body.image) {
-      updateData.image = req.body.image;
+    // Only update image if a new one was uploaded or provided
+    if (req.uploadedUrl || req.body.image) {
+      updateData.image = req.uploadedUrl || req.body.image;
     }
 
     console.log('Update data:', updateData);
 
-    const category = await HomepageCategory.findByIdAndUpdate(
+    const updatedCategory = await HomepageCategory.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true }
     ).populate('products');
 
-    console.log('Updated category:', category);
-    console.log('Updated products count:', category ? category.products.length : 0);
-
-    if (!category) {
-      console.log('Category not found for update:', req.params.id);
+    if (!updatedCategory) {
       return res.status(404).json({ success: false, message: 'Category not found' });
     }
 
-    res.json({ success: true, data: category });
+    console.log('Updated category:', updatedCategory);
+    res.json({ success: true, data: updatedCategory });
   } catch (error) {
     console.error('Error updating category:', error);
-    console.error('Stack trace:', error.stack);
     res.status(400).json({ success: false, message: error.message });
   }
 });
