@@ -52,7 +52,7 @@ const getAllBrands = async (req, res) => {
     }
 
     const brands = await Brand.find(query)
-      .sort({ name: 1 })
+      .sort({ displayOrder: 1, name: 1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
@@ -82,7 +82,7 @@ const getActiveBrands = async (req, res) => {
   try {
     const brands = await Brand.find({ isActive: true })
       .select('name _id logo description website')
-      .sort({ name: 1 });
+      .sort({ displayOrder: 1, name: 1 });
 
     res.json({
       success: true,
@@ -228,6 +228,37 @@ const updateBrand = async (req, res) => {
   }
 };
 
+// Update brand display order
+const updateBrandOrder = async (req, res) => {
+  try {
+    const { displayOrder } = req.body;
+    const brand = await Brand.findById(req.params.id);
+
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        message: 'Brand-ul nu a fost găsit'
+      });
+    }
+
+    brand.displayOrder = displayOrder;
+    await brand.save();
+
+    res.json({
+      success: true,
+      message: 'Ordinea brand-ului a fost actualizată cu succes',
+      data: brand
+    });
+  } catch (error) {
+    console.error('Error updating brand order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Eroare la actualizarea ordinii brand-ului',
+      error: error.message
+    });
+  }
+};
+
 // Delete brand
 const deleteBrand = async (req, res) => {
   try {
@@ -267,6 +298,7 @@ module.exports = {
   getBrandById,
   createBrand,
   updateBrand,
+  updateBrandOrder,
   deleteBrand,
   upload
 }; 

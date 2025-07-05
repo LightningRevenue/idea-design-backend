@@ -6,10 +6,11 @@ const {
   getBrandById, 
   createBrand, 
   updateBrand, 
-  deleteBrand,
-  upload
+  updateBrandOrder,
+  deleteBrand
 } = require('../controllers/brandController');
 const { verifyAdmin } = require('../middleware/adminAuth');
+const { uploadAndProcessBrandLogo } = require('../middleware/s3Upload');
 
 // Public routes
 router.get('/active', getActiveBrands); // For dropdown in forms
@@ -17,12 +18,18 @@ router.get('/active', getActiveBrands); // For dropdown in forms
 // Protected admin routes
 router.use(verifyAdmin); // All routes below require admin authentication
 
-router.get('/', getAllBrands);
-router.get('/:id', getBrandById);
-const { uploadAndProcessBrandLogo } = require('../middleware/s3Upload');
+// Routes for all brands
+router.route('/')
+  .get(getAllBrands)
+  .post(uploadAndProcessBrandLogo, createBrand);
 
-router.post('/', uploadAndProcessBrandLogo, createBrand);
-router.put('/:id', uploadAndProcessBrandLogo, updateBrand);
-router.delete('/:id', deleteBrand);
+// Routes for a single brand
+router.route('/:id')
+  .get(getBrandById)
+  .put(uploadAndProcessBrandLogo, updateBrand)
+  .delete(deleteBrand);
+
+// Route for updating display order
+router.route('/:id/order').put(updateBrandOrder);
 
 module.exports = router; 
