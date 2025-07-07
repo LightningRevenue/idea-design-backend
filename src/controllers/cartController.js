@@ -6,6 +6,14 @@ const mongoose = require('mongoose');
 async function getCart({ userId, guestId }) {
   console.log('Getting cart with userId:', userId, 'guestId:', guestId);
   
+  const deepPopulate = {
+    path: 'items.product',
+    populate: {
+      path: 'category',
+      select: 'name' // Only select the 'name' field from the category
+    }
+  };
+  
   // Always prioritize userId if available
   if (userId) {
     // Make sure userId is a valid ObjectId
@@ -18,7 +26,7 @@ async function getCart({ userId, guestId }) {
     const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
     console.log('Looking for cart with user ObjectId:', userObjectId);
     
-    const cart = await Cart.findOne({ user: userObjectId }).populate('items.product');
+    const cart = await Cart.findOne({ user: userObjectId }).populate(deepPopulate);
     console.log('Cart found for user:', cart ? 'Yes' : 'No');
     
     // If cart found, return it
@@ -42,7 +50,7 @@ async function getCart({ userId, guestId }) {
   // Only use guestId if userId is not available
   else if (guestId) {
     console.log('Looking for cart with guestId:', guestId);
-    const cart = await Cart.findOne({ guestId }).populate('items.product');
+    const cart = await Cart.findOne({ guestId }).populate(deepPopulate);
     console.log('Cart found for guest:', cart ? 'Yes' : 'No');
     // Filter out items with null product
     if (cart && cart.items && Array.isArray(cart.items)) {

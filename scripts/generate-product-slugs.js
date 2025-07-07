@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const Product = require('../src/models/Product');
+const Category = require('../src/models/Category');
 
 // Load environment variables
 dotenv.config();
@@ -30,27 +31,24 @@ async function generateProductSlugs() {
     
     console.log('✅ Connected to MongoDB');
     
-    // Find all products without slugs
-    const products = await Product.find({ 
-      $or: [
-        { slug: { $exists: false } },
-        { slug: null },
-        { slug: '' }
-      ]
-    });
+    // Find all products
+    const products = await Product.find()
+      .populate('category', 'name'); // Populate category to get the name
     
-    console.log(`📦 Found ${products.length} products without slugs`);
-    
-    if (products.length === 0) {
-      console.log('✅ All products already have slugs!');
-      process.exit(0);
-    }
+    console.log(`📦 Found ${products.length} products to update`);
     
     let updatedCount = 0;
     
     for (const product of products) {
       try {
-        let baseSlug = createSlug(product.name);
+        // Create base slug with category name if available
+        let baseSlug;
+        if (product.category && product.category.name) {
+          baseSlug = createSlug(`${product.category.name} ${product.name}`);
+        } else {
+          baseSlug = createSlug(product.name);
+        }
+        
         let slug = baseSlug;
         let counter = 1;
         

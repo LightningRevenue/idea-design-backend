@@ -7,7 +7,21 @@ const path = require('path');
 // @access  Public
 exports.getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find();
+    const { search, limit = 10 } = req.query;
+    let query = {};
+
+    // Add search functionality
+    if (search) {
+      query = {
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      };
+    }
+
+    const categories = await Category.find(query)
+      .limit(Number(limit));
     
     res.status(200).json({
       success: true,

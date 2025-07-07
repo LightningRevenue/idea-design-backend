@@ -9,9 +9,46 @@ const { uploadAndProcessCategoryImage } = require('../middleware/s3Upload');
 router.get('/', async (req, res) => {
   try {
     const categories = await HomepageCategory.find()
-      .populate('products')
+      .populate({
+        path: 'products',
+        select: '_id name price images category slug description discountType discountValue discountStartDate discountEndDate',
+        populate: {
+          path: 'category',
+          select: 'name slug'
+        }
+      })
       .sort('displayOrder');
-    res.json({ success: true, data: categories });
+
+    // Calculate discounted prices for products
+    const categoriesWithDiscounts = categories.map(category => {
+      const categoryData = category.toObject();
+      categoryData.products = categoryData.products.map(product => {
+        const now = new Date();
+        let discountedPrice = null;
+
+        if (product.discountType !== 'none' && product.discountValue > 0) {
+          const isDiscountActive = (!product.discountStartDate || now >= product.discountStartDate) &&
+                                 (!product.discountEndDate || now <= product.discountEndDate);
+
+          if (isDiscountActive) {
+            if (product.discountType === 'percentage') {
+              const discount = (product.price * product.discountValue) / 100;
+              discountedPrice = Math.max(0, product.price - discount);
+            } else if (product.discountType === 'fixed') {
+              discountedPrice = Math.max(0, product.price - product.discountValue);
+            }
+          }
+        }
+
+        return {
+          ...product,
+          discountedPrice
+        };
+      });
+      return categoryData;
+    });
+
+    res.json({ success: true, data: categoriesWithDiscounts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

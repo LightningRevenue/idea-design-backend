@@ -204,7 +204,18 @@ function createSlug(text) {
 // Middleware to create a slug from the name before saving
 ProductSchema.pre('save', async function(next) {
   if (this.isModified('name') || this.isNew) {
-    let baseSlug = createSlug(this.name);
+    // Populate the category if it's not already populated
+    if (this.category && typeof this.category === 'object' && !this.category.name) {
+      await this.populate('category', 'name');
+    }
+    
+    let baseSlug;
+    if (this.category && this.category.name) {
+      baseSlug = createSlug(`${this.category.name} ${this.name}`);
+    } else {
+      baseSlug = createSlug(this.name);
+    }
+    
     let slug = baseSlug;
     let counter = 1;
     

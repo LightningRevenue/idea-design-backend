@@ -499,49 +499,32 @@ router.get('/:identifier', async (req, res) => {
     
     try {
         const identifier = req.params.identifier;
-        let product = null;
-        
-        // First try to find by slug
-        console.log(`Attempting to find product by slug: ${identifier}`);
-        product = await Product.findOne({ slug: identifier }).populate('category', 'name');
-        
-        // If not found by slug and identifier looks like a valid ObjectId, try by ID
-        if (!product && mongoose.Types.ObjectId.isValid(identifier)) {
-            console.log(`Slug not found, attempting to find product by ID: ${identifier}`);
+        let product;
+
+        // Try to find by ID first, then by slug
+        if (mongoose.Types.ObjectId.isValid(identifier)) {
             product = await Product.findById(identifier).populate('category', 'name');
+        } 
+        
+        // If not found by ID, try by slug
+        if (!product) {
+            product = await Product.findOne({ slug: identifier }).populate('category', 'name');
         }
 
         if (!product) {
-            console.log(`Product with identifier ${identifier} not found in database.`);
-            return res.status(404).json({ success: false, message: 'Product not found' });
+            console.log(`Product with identifier '${identifier}' not found`);
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Produsul nu a fost găsit.' 
+            });
         }
+        
+        console.log(`Product found: ${product.name}, category:`, product.category);
 
-        console.log(`Product found: ${product.name} (slug: ${product.slug})`);
-        
-        // Debug discount info if product has discounts
-        if (product.discountType !== 'none') {
-          console.log(`Single product "${product.name}" discount debug:`, {
-            discountType: product.discountType,
-            discountValue: product.discountValue,
-            discountStartDate: product.discountStartDate,
-            discountEndDate: product.discountEndDate,
-            hasActiveDiscount: product.hasActiveDiscount,
-            discountedPrice: product.discountedPrice,
-            originalPrice: product.price,
-            currentTime: new Date()
-          });
-        }
-        
         res.json({ success: true, data: product });
-
     } catch (err) {
-        console.error(`Error in GET /api/products/${req.params.identifier}: ${err.message}`, err);
-        // More specific error check for CastError (often from invalid ID format during query)
-        if (err.name === 'CastError' && err.kind === 'ObjectId') {
-             console.error(`CastError: Invalid ObjectId format during findById for ID ${req.params.identifier}`);
-            return res.status(400).json({ success: false, message: 'Invalid product ID format during query' });
-        }
-        res.status(500).json({ success: false, message: 'Server Error while fetching product' });
+        console.error(`Error fetching product with identifier '${req.params.identifier}':`, err.message);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 });
 
