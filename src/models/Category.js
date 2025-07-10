@@ -7,6 +7,11 @@ const categorySchema = new mongoose.Schema({
     trim: true,
     unique: true
   },
+  slug: {
+    type: String,
+    unique: true,
+    index: true
+  },
   description: {
     type: String,
     required: [true, 'Descrierea categoriei este obligatorie'],
@@ -89,6 +94,24 @@ const categorySchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// Pre-save middleware to generate slug from name
+categorySchema.pre('save', function(next) {
+  if (!this.slug || this.isModified('name')) {
+    this.slug = this.name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[ăâ]/g, 'a')
+      .replace(/[îí]/g, 'i')
+      .replace(/[șş]/g, 's')
+      .replace(/[țţ]/g, 't')
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '');
+  }
+  next();
 });
 
 const Category = mongoose.model('Category', categorySchema);
