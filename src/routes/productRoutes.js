@@ -485,46 +485,35 @@ router.get('/', async (req, res) => {
   }
 });
 
-// @route   GET /api/products/:identifier
+// @route   GET /api/products/:id
 // @desc    Get a single product by ID or slug
 // @access  Public
-router.get('/:identifier', async (req, res) => {
-    console.log(`GET /api/products/:identifier route hit with identifier: ${req.params.identifier}`);
-    
-    // Check if this is actually the recommended route that's being caught (shouldn't happen but just to be safe)
-    if (req.params.identifier === 'recommended') {
-        console.log('Redirecting /recommended to the correct handler');
-        return res.redirect('/api/products/recommended');
-    }
-    
+router.get('/:id', async (req, res) => {
     try {
-        const identifier = req.params.identifier;
+        const identifier = req.params.id;
         let product;
 
-        // Try to find by ID first, then by slug
-        if (mongoose.Types.ObjectId.isValid(identifier)) {
+        // Try finding by current slug first
+        product = await Product.findOne({ slug: identifier }).populate('category', 'name');
+
+        // If not found, try finding by oldSlug
+        if (!product) {
+            product = await Product.findOne({ oldSlug: identifier }).populate('category', 'name');
+        }
+
+        // If still not found, try by ID as a fallback
+        if (!product && mongoose.Types.ObjectId.isValid(identifier)) {
             product = await Product.findById(identifier).populate('category', 'name');
-        } 
-        
-        // If not found by ID, try by slug
-        if (!product) {
-            product = await Product.findOne({ slug: identifier }).populate('category', 'name');
         }
 
         if (!product) {
-            console.log(`Product with identifier '${identifier}' not found`);
-            return res.status(404).json({ 
-                success: false, 
-                message: 'Produsul nu a fost găsit.' 
-            });
+            return res.status(404).json({ success: false, message: 'Produsul nu a fost găsit' });
         }
         
-        console.log(`Product found: ${product.name}, category:`, product.category);
-
         res.json({ success: true, data: product });
     } catch (err) {
-        console.error(`Error fetching product with identifier '${req.params.identifier}':`, err.message);
-        res.status(500).json({ success: false, message: 'Server Error' });
+        console.error('Error fetching product:', err);
+        res.status(500).json({ success: false, message: 'Eroare la încărcarea produsului' });
     }
 });
 

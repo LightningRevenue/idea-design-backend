@@ -118,6 +118,10 @@ const ProductSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
+  oldSlug: {
+    type: String,
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -201,31 +205,28 @@ function createSlug(text) {
     .replace(/-+$/, ''); // Remove trailing hyphens
 }
 
-// Middleware to create a slug from the name before saving
+// Pre-save middleware to generate slugs
 ProductSchema.pre('save', async function(next) {
-  if (this.isModified('name') || this.isNew) {
-    // Populate the category if it's not already populated
-    if (this.category && typeof this.category === 'object' && !this.category.name) {
-      await this.populate('category', 'name');
+  if (this.isModified('name') || this.isModified('category')) {
+    try {
+      // Get category name
+      const category = await mongoose.model('Category').findById(this.category);
+      const categoryName = category ? category.name : '';
+      
+      // Generate the new full slug (category + product name)
+      const fullSlug = createSlug(`${categoryName} ${this.name}`);
+      
+      // Generate the old style slug (just product name)
+      const oldStyleSlug = createSlug(this.name);
+      
+      // Only update slugs if they've changed
+      if (this.slug !== fullSlug) {
+        this.oldSlug = this.slug || oldStyleSlug; // Preserve current slug as oldSlug if it exists
+        this.slug = fullSlug;
+      }
+    } catch (error) {
+      next(error);
     }
-    
-    let baseSlug;
-    if (this.category && this.category.name) {
-      baseSlug = createSlug(`${this.category.name} ${this.name}`);
-    } else {
-      baseSlug = createSlug(this.name);
-    }
-    
-    let slug = baseSlug;
-    let counter = 1;
-    
-    // Check if slug already exists and make it unique
-    while (await mongoose.model('Product').findOne({ slug, _id: { $ne: this._id } })) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
-    }
-    
-    this.slug = slug;
   }
   next();
 });
