@@ -7,7 +7,7 @@ const path = require('path');
 // @access  Public
 exports.getCategories = async (req, res, next) => {
   try {
-    const { search, limit = 10 } = req.query;
+    const { search } = req.query;
     let query = {};
 
     // Add search functionality
@@ -20,8 +20,7 @@ exports.getCategories = async (req, res, next) => {
       };
     }
 
-    const categories = await Category.find(query)
-      .limit(Number(limit));
+    const categories = await Category.find(query);
     
     res.status(200).json({
       success: true,
