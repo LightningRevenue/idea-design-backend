@@ -57,8 +57,7 @@ const uploadToS3 = async (fileBuffer, fileName, contentType, folder = '') => {
         Key: key,
         Body: fileBuffer,
         ContentType: contentType,
-        // Removed ACL since bucket doesn't allow ACLs
-        // Public access should be configured at bucket level
+        ACL: 'public-read'
       },
     });
 
